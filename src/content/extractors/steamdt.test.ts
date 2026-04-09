@@ -1,0 +1,151 @@
+// @vitest-environment jsdom
+// @vitest-environment-options {"url":"https://steamdt.com/cs2/AK-47%20%7C%20Redline%20(Field-Tested)"}
+
+import { beforeEach, describe, expect, it } from 'vitest';
+import { steamdtExtractor } from './steamdt';
+
+declare global {
+  interface Window {
+    __NUXT__?: Record<string, unknown>;
+  }
+}
+
+describe('steamdtExtractor.extractPrice', () => {
+  function mockRect(
+    element: Element | null,
+    rect: Partial<DOMRect> & Pick<DOMRect, 'width' | 'height'>,
+  ) {
+    if (!element) return;
+    Object.defineProperty(element, 'getBoundingClientRect', {
+      value: () => ({
+        x: rect.left ?? 0,
+        y: rect.top ?? 0,
+        top: rect.top ?? 0,
+        left: rect.left ?? 0,
+        right: (rect.left ?? 0) + rect.width,
+        bottom: (rect.top ?? 0) + rect.height,
+        width: rect.width,
+        height: rect.height,
+        toJSON: () => ({}),
+      }),
+      configurable: true,
+    });
+  }
+
+  beforeEach(() => {
+    document.body.innerHTML = '';
+    document.title = 'AK-47 | Redline (Field-Tested) - SteamDT';
+    window.__NUXT__ = undefined;
+  });
+
+  it('reads current price from Nuxt hydration data when DOM selectors do not expose it', () => {
+    document.body.innerHTML = `
+      <div class="detail-header">
+        <h1>AK-47 | Redline (Field-Tested)</h1>
+      </div>
+      <div class="some-other-block">当前价已由客户端渲染</div>
+    `;
+
+    window.__NUXT__ = {
+      state: {
+        product: {
+          detail: {
+            itemInfo: {
+              sellMinPrice: '34999',
+            },
+          },
+        },
+      },
+    };
+
+    expect(steamdtExtractor.extractPrice()).toEqual({
+      current: 34999,
+      currency: 'CNY',
+      changePercent24h: undefined,
+    });
+  });
+
+  it('finds a hero-area anchor for the inline panel', () => {
+    document.body.innerHTML = `
+      <main>
+        <section class="detail-summary">
+          <div class="left-column">
+            <h1>AWP | 复古流行</h1>
+            <div class="price-main">¥459</div>
+          </div>
+          <div class="right-column">概况</div>
+        </section>
+      </main>
+    `;
+
+    mockRect(document.querySelector('.detail-summary'), { top: 80, left: 120, width: 980, height: 220 });
+    mockRect(document.querySelector('h1'), { top: 110, left: 160, width: 360, height: 32 });
+    mockRect(document.querySelector('.price-main'), { top: 160, left: 160, width: 180, height: 48 });
+
+    expect(steamdtExtractor.getPanelAnchor?.()?.className).toContain('detail-summary');
+  });
+
+  it('prefers the main hero price over lower secondary price cards', () => {
+    document.body.innerHTML = `
+      <main>
+        <section class="detail-summary">
+          <div class="left-column">
+            <h1>AWP | 复古流行</h1>
+            <div class="price-main" style="font-size: 42px;">¥459</div>
+          </div>
+        </section>
+        <section class="trend-side-list">
+          <div class="daily-card">今日 <span class="price-chip">¥23 (+5.28%)</span></div>
+        </section>
+      </main>
+    `;
+
+    mockRect(document.querySelector('.detail-summary'), { top: 70, left: 100, width: 940, height: 180 });
+    mockRect(document.querySelector('h1'), { top: 95, left: 140, width: 320, height: 28 });
+    mockRect(document.querySelector('.price-main'), { top: 145, left: 140, width: 180, height: 54 });
+    mockRect(document.querySelector('.price-chip'), { top: 390, left: 1120, width: 110, height: 26 });
+
+    expect(steamdtExtractor.extractPrice()).toEqual({
+      current: 459,
+      currency: 'CNY',
+      changePercent24h: undefined,
+    });
+  });
+
+  it('prefers the visible active main chart over inactive or sidebar charts', () => {
+    document.body.innerHTML = `
+      <main class="common-container">
+        <section class="detail-summary">
+          <h1>AWP | 复古流行</h1>
+          <div class="price-main">¥459</div>
+        </section>
+        <section class="goods-trend-layout">
+          <div class="trend-sidebar" style="display:none">
+            <div class="mini-history-chart">
+              <div class="el-tab-pane">
+                <div class="sidebar-chart" _echarts_instance_="2"></div>
+              </div>
+            </div>
+          </div>
+          <div class="market-trend-card">
+            <div class="el-tabs">
+              <div class="el-tabs__header">
+                <div class="is-active">日K</div>
+              </div>
+              <div class="el-tab-pane is-active">
+                <div class="main-kline-chart" _echarts_instance_="1"></div>
+              </div>
+            </div>
+          </div>
+        </section>
+      </main>
+    `;
+
+    mockRect(document.querySelector('.market-trend-card'), { top: 340, left: 100, width: 1040, height: 520 });
+    mockRect(document.querySelector('.main-kline-chart'), { top: 380, left: 140, width: 960, height: 420 });
+    mockRect(document.querySelector('.mini-history-chart'), { top: 360, left: 1180, width: 180, height: 120 });
+    mockRect(document.querySelector('.sidebar-chart'), { top: 380, left: 1190, width: 160, height: 100 });
+
+    expect(steamdtExtractor.getChartAnchor()?.className).toContain('market-trend-card');
+  });
+});

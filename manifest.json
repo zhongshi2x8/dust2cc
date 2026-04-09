@@ -1,0 +1,77 @@
+{
+  "manifest_version": 3,
+  "name": "dust2.cc",
+  "version": "1.0.0",
+  "description": "AI-powered CS2 skin market analysis by dust2.cc",
+  "icons": {
+    "16": "icons/icon-16.png",
+    "32": "icons/icon-32.png",
+    "48": "icons/icon-48.png",
+    "128": "icons/icon-128.png"
+  },
+  "permissions": [
+    "storage",
+    "sidePanel",
+    "activeTab",
+    "alarms",
+    "notifications"
+  ],
+  "host_permissions": [
+    "https://csqaq.com/*",
+    "https://*.csqaq.com/*",
+    "https://steamdt.com/*",
+    "https://*.steamdt.com/*",
+    "https://api.steamdt.com/*",
+    "https://buff.163.com/*",
+    "https://youpin898.com/*",
+    "https://api.anthropic.com/*",
+    "https://api.openai.com/*",
+    "https://api.deepseek.com/*",
+    "https://dashscope.aliyuncs.com/*",
+    "https://api.moonshot.ai/*",
+    "https://api.kimi.com/*",
+    "https://open.bigmodel.cn/*",
+    "https://generativelanguage.googleapis.com/*",
+    "http://localhost:*/*"
+  ],
+  "background": {
+    "service_worker": "src/background/index.ts",
+    "type": "module"
+  },
+  "content_scripts": [
+    {
+      "matches": [
+        "https://csqaq.com/*",
+        "https://*.csqaq.com/*",
+        "https://steamdt.com/*",
+        "https://*.steamdt.com/*"
+      ],
+      "js": [
+        "src/content/index.ts"
+      ],
+      "run_at": "document_start"
+    }
+  ],
+  "side_panel": {
+    "default_path": "src/sidepanel/index.html"
+  },
+  "action": {
+    "default_icon": {
+      "16": "icons/icon-16.png",
+      "32": "icons/icon-32.png",
+      "48": "icons/icon-48.png",
+      "128": "icons/icon-128.png"
+    }
+  },
+  "web_accessible_resources": [
+    {
+      "resources": ["page-script.js"],
+      "matches": [
+        "https://csqaq.com/*",
+        "https://*.csqaq.com/*",
+        "https://steamdt.com/*",
+        "https://*.steamdt.com/*"
+      ]
+    }
+  ]
+}
