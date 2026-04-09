@@ -6,7 +6,7 @@ src/.DS_Store
 
 .claude/
 .superpowers/
+public/page-script.js
 
 *.bak
 *.log
-
