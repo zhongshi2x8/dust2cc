@@ -15,22 +15,11 @@
 - `steamdt.com`
 - `csqaq.com`
 
-## 🚧 当前状态
-
-项目仍在持续迭代中。
-
-已知仍在重点优化的部分：
-
-- `steamdt.com` 的主图识别与 K 线抓取链路还在继续打磨
-
-## 📦 小白安装
-
-推荐直接下载发布好的 `dist.zip`，不用自己装 Node.js，也不用自己构建。
+## 📦 使用教程
 
 直接下载：
 
 - [点击下载 dist.zip](https://github.com/zhongshi2x8/dust2cc/releases/latest/download/dist.zip)
-- [查看全部版本](https://github.com/zhongshi2x8/dust2cc/releases)
 
 安装步骤：
 
@@ -99,27 +88,8 @@ npm run package
 release/dist.zip
 ```
 
-## 🧪 在 Chrome 中加载
 
-1. 执行 `npm run build`
-2. 打开 `chrome://extensions`
-3. 开启右上角“开发者模式”
-4. 点击“加载已解压的扩展程序”
-5. 选择项目下的 `dist` 目录
 
-## 🚀 维护者发布
-
-如果你是仓库维护者，执行下面这条命令即可生成发布包：
-
-```bash
-npm run package
-```
-
-生成好的文件在：
-
-```bash
-release/dist.zip
-```
 
 ## 📄 License
 
