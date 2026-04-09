@@ -9,6 +9,10 @@ import { isPriceAlignedWithReference, pickBestPriceCandidate } from '@shared/pri
 export class SteamdtExtractor implements SiteAdapter {
   name = 'steamdt' as const;
   matchUrl = /steamdt\.com\//;
+  private hydrationCacheKey: string | null = null;
+  private hydrationCacheValue: unknown = null;
+  private hydrationRecordCacheKey: string | null = null;
+  private hydrationRecordCacheValue: Record<string, unknown> | null = null;
 
   canAnalyzeUrl(url: string): boolean {
     const kind = getSteamdtPageKind(url);
@@ -243,23 +247,43 @@ export class SteamdtExtractor implements SiteAdapter {
   }
 
   private getHydrationData(): unknown {
+    const cacheKey = this.getHydrationCacheKey();
+    if (this.hydrationCacheKey === cacheKey) {
+      return this.hydrationCacheValue;
+    }
+
     const script = document.getElementById('__NUXT_DATA__');
     const scriptText = script?.textContent?.trim();
     if (scriptText) {
       try {
-        return JSON.parse(scriptText);
+        const parsed = JSON.parse(scriptText);
+        this.hydrationCacheKey = cacheKey;
+        this.hydrationCacheValue = parsed;
+        return parsed;
       } catch {
         // Ignore malformed hydration payloads.
       }
     }
 
     const nuxtData = (window as unknown as Record<string, unknown>).__NUXT__;
-    return nuxtData && typeof nuxtData === 'object' ? nuxtData : null;
+    const fallback = nuxtData && typeof nuxtData === 'object' ? nuxtData : null;
+    this.hydrationCacheKey = cacheKey;
+    this.hydrationCacheValue = fallback;
+    return fallback;
   }
 
   private findCurrentPageHydrationRecord(): Record<string, unknown> | null {
+    const cacheKey = `${this.getHydrationCacheKey()}::record`;
+    if (this.hydrationRecordCacheKey === cacheKey) {
+      return this.hydrationRecordCacheValue;
+    }
+
     const root = this.getHydrationData();
-    if (!root || typeof root !== 'object') return null;
+    if (!root || typeof root !== 'object') {
+      this.hydrationRecordCacheKey = cacheKey;
+      this.hydrationRecordCacheValue = null;
+      return null;
+    }
 
     const pageKind = getSteamdtPageKind(window.location.href, document.title);
     const itemNameCandidates = [
@@ -295,7 +319,10 @@ export class SteamdtExtractor implements SiteAdapter {
     };
 
     visit(root);
-    return bestScore >= 20 ? bestRecord : null;
+    const resolved = bestScore >= 20 ? bestRecord : null;
+    this.hydrationRecordCacheKey = cacheKey;
+    this.hydrationRecordCacheValue = resolved;
+    return resolved;
   }
 
   private scoreHydrationRecord(
@@ -376,6 +403,11 @@ export class SteamdtExtractor implements SiteAdapter {
     }
 
     return current;
+  }
+
+  private getHydrationCacheKey(): string {
+    const scriptText = document.getElementById('__NUXT_DATA__')?.textContent ?? '';
+    return `${window.location.pathname}${window.location.search}::${scriptText.length}`;
   }
 
   private extractPriceFromDom(): PriceInfo | null {

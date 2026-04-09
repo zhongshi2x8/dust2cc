@@ -87,6 +87,55 @@ let preferredKlineSource: 'network' | 'echarts' | null = null;
 let acceptedKlineScore = Number.NEGATIVE_INFINITY;
 let pageContextKey = '';
 
+function formatRuntimeError(error: unknown): string {
+  return error instanceof Error ? error.message : String(error);
+}
+
+function setPanelPlaceholder(message: string) {
+  const panel = document.getElementById(PANEL_ID);
+  const analysisStatic = panel?.shadowRoot?.getElementById('analysis-static');
+  const analysisStream = panel?.shadowRoot?.getElementById('analysis-stream');
+  if (analysisStatic) {
+    analysisStatic.innerHTML = `<p class="placeholder">⚠️ ${message}</p>`;
+  }
+  analysisStream?.classList.add('hidden');
+}
+
+function safeExtractGoodsInfo(): GoodsInfo | null {
+  try {
+    return currentAdapter?.extractGoodsInfo() ?? null;
+  } catch (error) {
+    const message = `读取商品信息失败：${formatRuntimeError(error)}`;
+    console.error('[dust2cc] extractGoodsInfo failed', error);
+    setDebugState({ lastIssue: message });
+    return null;
+  }
+}
+
+function safeExtractPrice(): PriceInfo | null {
+  try {
+    return currentAdapter?.extractPrice() ?? null;
+  } catch (error) {
+    const message = `读取价格失败：${formatRuntimeError(error)}`;
+    console.error('[dust2cc] extractPrice failed', error);
+    setDebugState({ lastIssue: message });
+    return null;
+  }
+}
+
+function safeSyncStateFromDom(context: string): boolean {
+  try {
+    syncStateFromDom();
+    return true;
+  } catch (error) {
+    const message = `${context}失败：${formatRuntimeError(error)}`;
+    console.error('[dust2cc] syncStateFromDom failed', error);
+    setDebugState({ lastIssue: message });
+    setPanelPlaceholder(message);
+    return false;
+  }
+}
+
 function supportsInlinePanel() {
   return isCurrentPageAnalyzable();
 }
@@ -166,7 +215,7 @@ function init() {
     for (const delay of [2000, 4000, 7000]) {
       setTimeout(() => {
         if (state.kline.length < 5) {
-          syncStateFromDom();
+          safeSyncStateFromDom('延迟同步页面数据');
           onContentReady();
         }
       }, delay);
@@ -242,7 +291,7 @@ function handleCapturedData(payload: { type: string; data: unknown }) {
       break;
   }
 
-  syncStateFromDom();
+  safeSyncStateFromDom('抓取后同步页面数据');
   broadcastPageState();
   maybeAutoAnalyze();
 }
@@ -322,7 +371,7 @@ function onContentReady() {
     return;
   }
 
-  syncStateFromDom();
+  safeSyncStateFromDom('页面内容同步');
 
   const chartAnchor = currentAdapter.getChartAnchor();
   const panelAnchor =
@@ -388,13 +437,13 @@ function syncStateFromDom() {
   if (!currentAdapter) return;
   ensureFreshPageContext();
 
-  const domGoodsInfo = currentAdapter.extractGoodsInfo();
+  const domGoodsInfo = safeExtractGoodsInfo();
   if (domGoodsInfo) {
     state.goodsInfo = mergeGoodsInfo(state.goodsInfo, domGoodsInfo);
   }
 
   const previousPrice = state.price;
-  const extractedPrice = currentAdapter.extractPrice();
+  const extractedPrice = safeExtractPrice();
   state.price = pickBetterPriceInfo(extractedPrice, state.price);
 
   if (
@@ -762,7 +811,7 @@ function getReferenceClosePrice(): number | undefined {
 
 function resolveAnalysisPrice(priceInfo: PriceInfo | null): number {
   const referenceClose = getReferenceClosePrice();
-  const observedCurrent = currentAdapter?.extractPrice()?.current;
+  const observedCurrent = safeExtractPrice()?.current;
   if (currentAdapter?.name === 'steamdt' && getSteamdtPageKind(window.location.href, document.title) === 'market-index') {
     return referenceClose ?? observedCurrent ?? priceInfo?.current ?? 0;
   }
@@ -850,7 +899,7 @@ function scoreKlineQuality(points: KlinePoint[]): number {
 
 function getTrustedSteamdtReferencePrices(): number[] {
   const values = [
-    currentAdapter?.extractPrice()?.current,
+    safeExtractPrice()?.current,
     state.price?.current,
     acceptedKlineScore >= 75 ? state.kline[state.kline.length - 1]?.close : undefined,
   ].filter((value): value is number => typeof value === 'number' && Number.isFinite(value) && value > 0);
@@ -1367,7 +1416,7 @@ function renderMarkdown(text: string): string {
 
 chrome.runtime.onMessage.addListener((msg, _sender, sendResponse) => {
   if (msg.type === 'REQUEST_ANALYSIS') {
-    syncStateFromDom();
+    safeSyncStateFromDom('响应分析请求');
 
     const panel = document.getElementById(PANEL_ID);
     if (panel?.shadowRoot) {
@@ -1386,7 +1435,7 @@ chrome.runtime.onMessage.addListener((msg, _sender, sendResponse) => {
   }
 
   if (msg.type === 'REQUEST_PAGE_STATE') {
-    syncStateFromDom();
+    safeSyncStateFromDom('响应页面状态请求');
     sendResponse?.({ ok: true, data: getPageSnapshot() });
     return true;
   }
