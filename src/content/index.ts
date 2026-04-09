@@ -16,6 +16,7 @@ import { buildAnalysisFingerprint } from '@shared/analysis-fingerprint';
 import { detectAllPatterns } from '@shared/patterns';
 import { buildKlineAnalysisPrompt } from '@shared/prompts/kline-analysis';
 import { generateQuickSignal } from '@shared/prompts/trade-signal';
+import { detectTupleKlineFormat, normalizePriceLikeKlineRecords, normalizeTupleKlineList, sanitizeKlinePoints } from '@shared/kline-normalization';
 import {
   getBestReferenceDeltaRatio,
   isPriceAlignedWithReference,
@@ -214,7 +215,7 @@ function normalizeKlineData(raw: unknown): KlinePoint[] {
       ohlc: Array<[number, number, number, number]>;
       volumes?: number[];
     };
-    return sanitizeKlineData(data.ohlc.map((point, i) => ({
+    return sanitizeKlinePoints(data.ohlc.map((point, i) => ({
       date: data.dates?.[i] ?? String(i),
       open: Number(point[0] ?? 0),
       close: Number(point[1] ?? 0),
@@ -226,138 +227,13 @@ function normalizeKlineData(raw: unknown): KlinePoint[] {
 
   if (Array.isArray(nested)) {
     if (Array.isArray(nested[0])) {
-      return synthesizeOhlcFromTupleList(nested as unknown[][]);
+      return normalizeTupleKlineList(nested as unknown[][]);
     }
 
-    // Check if this is a trendList (SteamDT-style: single price per point, no OHLC)
-    const first = nested[0] as Record<string, unknown> | undefined;
-    if (first && !('open' in first) && !('o' in first) && ('price' in first || 'avgPrice' in first || 'closePrice' in first)) {
-      return synthesizeOhlcFromPriceList(nested as Record<string, unknown>[]);
-    }
-
-    return sanitizeKlineData(nested.map((item: Record<string, unknown>) => ({
-      date: String(item.date || item.time || item.ts || item.t || item.timestamp || item.createTime || item.tradeDate || ''),
-      open: Number(item.open || item.o || item.openPrice || 0),
-      high: Number(item.high || item.h || item.highPrice || item.maxPrice || 0),
-      low: Number(item.low || item.l || item.lowPrice || item.minPrice || 0),
-      close: Number(item.close || item.c || item.closePrice || 0),
-      volume: Number(item.volume || item.vol || item.v || item.tradeNum || item.count || 0),
-    })));
+    return normalizePriceLikeKlineRecords(nested as Record<string, unknown>[]);
   }
 
   return [];
-}
-
-/**
- * For sites like SteamDT that provide only a single price per data point
- * (no open/high/low/close), synthesize OHLC from sequential prices.
- * Uses a sliding window to create candlestick-like data.
- */
-function synthesizeOhlcFromPriceList(list: Record<string, unknown>[]): KlinePoint[] {
-  const points: KlinePoint[] = [];
-
-  for (let i = 0; i < list.length; i++) {
-    const item = list[i];
-    const price = Number(item.price || item.avgPrice || item.closePrice || item.close || 0);
-    if (!price || !Number.isFinite(price)) continue;
-
-    const prevPrice = i > 0
-      ? Number(list[i - 1].price || list[i - 1].avgPrice || list[i - 1].closePrice || list[i - 1].close || price)
-      : price;
-
-    const high = Number(item.maxPrice || item.highPrice || item.high || Math.max(price, prevPrice));
-    const low = Number(item.minPrice || item.lowPrice || item.low || Math.min(price, prevPrice));
-
-    points.push({
-      date: String(item.date || item.time || item.ts || item.timestamp || item.createTime || item.tradeDate || ''),
-      open: prevPrice,
-      high: Math.max(high, price, prevPrice),
-      low: Math.min(low, price, prevPrice),
-      close: price,
-      volume: Number(item.volume || item.vol || item.tradeNum || item.count || 0),
-    });
-  }
-
-  return sanitizeKlineData(points);
-}
-
-function synthesizeOhlcFromTupleList(list: unknown[][]): KlinePoint[] {
-  const points: KlinePoint[] = [];
-
-  for (let i = 0; i < list.length; i++) {
-    const tuple = list[i];
-    if (!Array.isArray(tuple) || tuple.length < 2) continue;
-
-    const timestamp = tuple[0];
-    const sellPrice = Number(tuple[1] ?? 0);
-    const sellCount = Number(tuple[2] ?? 0);
-    const biddingPrice = Number(tuple[3] ?? 0);
-    const biddingCount = Number(tuple[4] ?? 0);
-    const transactionAmount = Number(tuple[5] ?? 0);
-    const transactionCount = Number(tuple[6] ?? 0);
-
-    const priceCandidates = [sellPrice, biddingPrice].filter((value) => Number.isFinite(value) && value > 0);
-    const closePrice = priceCandidates[0] ?? 0;
-    if (!closePrice) continue;
-
-    const previousTuple = i > 0 ? list[i - 1] : null;
-    const previousSellPrice = previousTuple ? Number(previousTuple[1] ?? 0) : closePrice;
-    const previousBidPrice = previousTuple ? Number(previousTuple[3] ?? 0) : closePrice;
-    const previousPriceCandidates = [previousSellPrice, previousBidPrice].filter(
-      (value) => Number.isFinite(value) && value > 0,
-    );
-    const openPrice = previousPriceCandidates[0] ?? closePrice;
-    const high = Math.max(...priceCandidates, ...previousPriceCandidates, closePrice, openPrice);
-    const low = Math.min(...priceCandidates, ...previousPriceCandidates, closePrice, openPrice);
-
-    points.push({
-      date: normalizeTupleTimestamp(timestamp, i),
-      open: openPrice,
-      high,
-      low,
-      close: closePrice,
-      volume: transactionCount || sellCount || biddingCount || transactionAmount || 0,
-    });
-  }
-
-  return sanitizeKlineData(points);
-}
-
-function normalizeTupleTimestamp(value: unknown, index: number): string {
-  if (typeof value === 'number' && Number.isFinite(value) && value > 0) {
-    const millis = value > 1_000_000_000_000 ? value : value * 1000;
-    return new Date(millis).toISOString();
-  }
-
-  if (typeof value === 'string' && value.trim()) {
-    const numeric = Number(value);
-    if (Number.isFinite(numeric) && numeric > 0) {
-      const millis = numeric > 1_000_000_000_000 ? numeric : numeric * 1000;
-      return new Date(millis).toISOString();
-    }
-
-    return value;
-  }
-
-  return `tuple-${index}`;
-}
-
-function sanitizeKlineData(points: KlinePoint[]): KlinePoint[] {
-  return points
-    .filter((point) =>
-      [point.open, point.high, point.low, point.close].every((value) => Number.isFinite(value) && value > 0),
-    )
-    .map((point, index) => {
-      const high = Math.max(point.high, point.open, point.close, point.low);
-      const low = Math.min(point.low, point.open, point.close, point.high);
-      return {
-        ...point,
-        date: point.date || `point-${index}`,
-        high,
-        low,
-        volume: Number.isFinite(point.volume) ? point.volume : 0,
-      };
-    });
 }
 
 function unwrapPayload(raw: unknown): unknown {
@@ -764,6 +640,10 @@ function shouldAcceptKlinePayload(
   if (meta.periodHint === '1d') score += 18;
   if (meta.periodHint === '1w' || meta.periodHint === '1m') score -= 8;
 
+  const payloadShape = classifyKlinePayloadShape(rawPayload);
+  if (payloadShape === 'ohlc') score += 20;
+  if (payloadShape === 'price-trend') score += 6;
+
   const trustedReferences = getTrustedSteamdtReferencePrices();
   const bestDelta = getBestReferenceDeltaRatio(lastClose, trustedReferences);
   if (bestDelta !== undefined) {
@@ -872,6 +752,34 @@ function getKlinePayloadMeta(raw: unknown): KlinePayloadMeta {
   }
 
   return {};
+}
+
+function classifyKlinePayloadShape(raw: unknown): 'ohlc' | 'price-trend' | 'unknown' {
+  const nested = unwrapPayload(raw);
+  if (Array.isArray(nested) && Array.isArray(nested[0])) {
+    return detectTupleKlineFormat(nested as unknown[][]) === 'ohlc' ? 'ohlc' : 'price-trend';
+  }
+
+  if (Array.isArray(nested) && nested[0] && typeof nested[0] === 'object') {
+    const first = nested[0] as Record<string, unknown>;
+    if (
+      ['open', 'openPrice', 'o'].some((key) => typeof first[key] !== 'undefined') &&
+      ['high', 'highPrice', 'h', 'maxPrice'].some((key) => typeof first[key] !== 'undefined') &&
+      ['low', 'lowPrice', 'l', 'minPrice'].some((key) => typeof first[key] !== 'undefined')
+    ) {
+      return 'ohlc';
+    }
+
+    if (
+      ['sellPrice', 'biddingPrice', 'price', 'avgPrice', 'closePrice'].some(
+        (key) => typeof first[key] !== 'undefined',
+      )
+    ) {
+      return 'price-trend';
+    }
+  }
+
+  return 'unknown';
 }
 
 function scoreKlineQuality(points: KlinePoint[]): number {

@@ -3,6 +3,7 @@
 // ============================================================
 
 import type { GoodsInfo, PriceInfo, KlinePoint, SiteAdapter, ApiPattern } from '@shared/types';
+import { normalizePriceLikeKlineRecords, normalizeTupleKlineList } from '@shared/kline-normalization';
 import { isPriceAlignedWithReference, pickBestPriceCandidate } from '@shared/price-selection';
 
 export class SteamdtExtractor implements SiteAdapter {
@@ -612,61 +613,12 @@ export function normalizeSteamdtTrendResponse(raw: unknown): KlinePoint[] {
   if (!Array.isArray(trendList)) return [];
 
   if (Array.isArray(trendList[0])) {
-    return trendList
-      .filter((item: unknown) => Array.isArray(item) && item.length >= 2)
-      .map((item: unknown, index) => {
-        const tuple = item as unknown[];
-        const timestamp = tuple[0];
-        const sellPrice = Number(tuple[1] ?? 0);
-        const biddingPrice = Number(tuple[3] ?? 0);
-        const close = sellPrice || biddingPrice || 0;
-        const previousTuple = index > 0 && Array.isArray(trendList[index - 1]) ? trendList[index - 1] as unknown[] : null;
-        const previousClose = previousTuple ? Number(previousTuple[1] ?? previousTuple[3] ?? close) : close;
-
-        return {
-          date: normalizeSteamdtTupleTimestamp(timestamp, index),
-          open: previousClose,
-          high: Math.max(close, previousClose, sellPrice || close, biddingPrice || close),
-          low: Math.min(close, previousClose, sellPrice || close, biddingPrice || close),
-          close,
-          volume: Number(tuple[6] ?? tuple[2] ?? tuple[4] ?? tuple[5] ?? 0),
-        };
-      })
-      .filter((point) => point.close > 0);
+    return normalizeTupleKlineList(trendList as unknown[][]);
   }
 
-  return trendList
-    .filter((item: unknown) => item && typeof item === 'object')
-    .map((item: Record<string, unknown>) => ({
-      date: String(
-        item.date || item.time || item.ts || item.timestamp ||
-        item.createTime || item.tradeDate || '',
-      ),
-      open: Number(item.open || item.openPrice || item.o || item.price || 0),
-      high: Number(item.high || item.highPrice || item.h || item.maxPrice || item.price || 0),
-      low: Number(item.low || item.lowPrice || item.l || item.minPrice || item.price || 0),
-      close: Number(item.close || item.closePrice || item.c || item.price || item.avgPrice || 0),
-      volume: Number(item.volume || item.vol || item.v || item.tradeNum || item.count || 0),
-    }));
-}
-
-function normalizeSteamdtTupleTimestamp(value: unknown, index: number): string {
-  if (typeof value === 'number' && Number.isFinite(value) && value > 0) {
-    const millis = value > 1_000_000_000_000 ? value : value * 1000;
-    return new Date(millis).toISOString();
-  }
-
-  if (typeof value === 'string' && value.trim()) {
-    const parsed = Number(value);
-    if (Number.isFinite(parsed) && parsed > 0) {
-      const millis = parsed > 1_000_000_000_000 ? parsed : parsed * 1000;
-      return new Date(millis).toISOString();
-    }
-
-    return value;
-  }
-
-  return `tuple-${index}`;
+  return normalizePriceLikeKlineRecords(
+    trendList.filter((item: unknown): item is Record<string, unknown> => !!item && typeof item === 'object'),
+  );
 }
 
 /** Normalize SteamDT item detail to GoodsInfo */
