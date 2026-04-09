@@ -5,6 +5,7 @@ import {
   isPriceAlignedWithReferences,
   pickBestPriceCandidate,
   pickPreferredObservedPrice,
+  resolveBestAnalysisPrice,
 } from './price-selection';
 
 describe('pickBestPriceCandidate', () => {
@@ -72,5 +73,19 @@ describe('reference helpers', () => {
 
   it('returns the closest delta ratio among multiple references', () => {
     expect(getBestReferenceDeltaRatio(463.6, [115, 463.8])).toBeCloseTo(0.000431, 4);
+  });
+});
+
+describe('resolveBestAnalysisPrice', () => {
+  it('prefers the kline close when stale page price is far below the locked main chart', () => {
+    expect(resolveBestAnalysisPrice(1259, 35989.5)).toBe(35989.5);
+  });
+
+  it('prefers the fresh observed page price when it matches the main chart', () => {
+    expect(resolveBestAnalysisPrice(1259, 35989.5, 35980)).toBe(35980);
+  });
+
+  it('keeps the current price when it is aligned with the reference close', () => {
+    expect(resolveBestAnalysisPrice(35988, 35989.5)).toBe(35988);
   });
 });

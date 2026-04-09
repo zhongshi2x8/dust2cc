@@ -112,3 +112,24 @@ export function pickPreferredObservedPrice<T extends PriceCandidate>(
     referencePrice,
   );
 }
+
+export function resolveBestAnalysisPrice(
+  currentPrice?: number,
+  referencePrice?: number,
+  observedPrice?: number,
+): number {
+  const candidates = [
+    { value: observedPrice, weight: 18 },
+    { value: currentPrice, weight: 14 },
+    { value: referencePrice, weight: 12 },
+  ];
+
+  const references = [observedPrice, referencePrice];
+  return (
+    pickBestPriceCandidate(candidates, references)?.value ??
+    observedPrice ??
+    currentPrice ??
+    referencePrice ??
+    0
+  );
+}

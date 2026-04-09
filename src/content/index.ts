@@ -24,6 +24,7 @@ import {
   isPriceAlignedWithReferences,
   pickBestPriceCandidate,
   pickPreferredObservedPrice,
+  resolveBestAnalysisPrice,
 } from '@shared/price-selection';
 import { getSettings } from '@shared/storage';
 import { getAdapterForUrl } from './extractors/base';
@@ -700,20 +701,8 @@ function getReferenceClosePrice(): number | undefined {
 
 function resolveAnalysisPrice(priceInfo: PriceInfo | null): number {
   const referenceClose = getReferenceClosePrice();
-  if (priceInfo?.current && !isPriceAlignedWithReference(referenceClose, priceInfo.current, 0.25)) {
-    return priceInfo.current;
-  }
-  return (
-    pickBestPriceCandidate(
-      [
-        { value: priceInfo?.current, weight: 10 },
-        { value: referenceClose, weight: 0 },
-      ],
-      referenceClose,
-    )?.value ??
-    referenceClose ??
-    0
-  );
+  const observedCurrent = currentAdapter?.extractPrice()?.current;
+  return resolveBestAnalysisPrice(priceInfo?.current, referenceClose, observedCurrent);
 }
 
 function pickBetterPriceInfo(primary: PriceInfo | null, fallback: PriceInfo | null): PriceInfo | null {
