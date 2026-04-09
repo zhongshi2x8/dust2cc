@@ -33,6 +33,7 @@ describe('steamdtExtractor.extractPrice', () => {
   }
 
   beforeEach(() => {
+    window.history.replaceState({}, '', 'https://steamdt.com/cs2/AK-47%20%7C%20Redline%20(Field-Tested)');
     document.body.innerHTML = '';
     document.title = 'AK-47 | Redline (Field-Tested) - SteamDT';
     window.__NUXT__ = undefined;
@@ -62,6 +63,27 @@ describe('steamdtExtractor.extractPrice', () => {
       current: 34999,
       currency: 'CNY',
       changePercent24h: undefined,
+    });
+  });
+
+  it('reads the market index price from __NUXT_DATA__ on steamdt section pages', () => {
+    window.history.replaceState({}, '', 'https://steamdt.com/section?type=BROAD');
+    document.title = 'CS2饰品板块指数-CS2饰品大盘-CS2板块大盘-SteamDT';
+    document.body.innerHTML = `
+      <script id="__NUXT_DATA__" type="application/json">
+        [{"data":{"record":{"name":"大盘","type":"BROAD","index":1073.2,"yesterdayIndex":1073.27,"riseFallRate":-0.01}}}]
+      </script>
+    `;
+
+    expect(steamdtExtractor.extractPrice()).toEqual({
+      current: 1073.2,
+      currency: 'CNY',
+      changePercent24h: -0.01,
+    });
+    expect(steamdtExtractor.extractGoodsInfo()).toEqual({
+      id: 'steamdt-market-index-BROAD',
+      name: 'SteamDT 大盘指数',
+      source: 'steamdt',
     });
   });
 
@@ -109,6 +131,32 @@ describe('steamdtExtractor.extractPrice', () => {
       current: 459,
       currency: 'CNY',
       changePercent24h: undefined,
+    });
+  });
+
+  it('prefers the current item hydration price when the DOM price is from a wrong card', () => {
+    document.body.innerHTML = `
+      <main>
+        <section class="detail-summary">
+          <div class="left-column">
+            <h1>AK-47 | 红线 (久经沙场)</h1>
+            <div class="price-main" style="font-size: 42px;">¥1280</div>
+          </div>
+        </section>
+        <script id="__NUXT_DATA__" type="application/json">
+          [{"data":{"detail":{"itemId":"22499","marketHashName":"AK-47 | Redline (Field-Tested)","name":"AK-47 | 红线 (久经沙场)","lowestPrice":226,"diff1Day":-1.27}}}]
+        </script>
+      </main>
+    `;
+
+    mockRect(document.querySelector('.detail-summary'), { top: 70, left: 100, width: 940, height: 180 });
+    mockRect(document.querySelector('h1'), { top: 95, left: 140, width: 320, height: 28 });
+    mockRect(document.querySelector('.price-main'), { top: 145, left: 140, width: 180, height: 54 });
+
+    expect(steamdtExtractor.extractPrice()).toEqual({
+      current: 226,
+      currency: 'CNY',
+      changePercent24h: -1.27,
     });
   });
 
@@ -209,6 +257,7 @@ describe('steamdtExtractor.extractPrice', () => {
   it('classifies steamdt item and index pages correctly', () => {
     expect(isSteamdtDetailUrl('https://steamdt.com/cs2/AK-47%20%7C%20Redline%20(Field-Tested)')).toBe(true);
     expect(getSteamdtPageKind('https://steamdt.com/', 'SteamDT-CS饰品价格走势_CS2市场大盘_饰品指数')).toBe('market-index');
+    expect(getSteamdtPageKind('https://steamdt.com/section?type=BROAD', 'CS2饰品板块指数-CS2饰品大盘')).toBe('market-index');
     expect(getSteamdtPageKind('https://steamdt.com/cs2/market')).toBe('other');
     expect(getSteamdtPageKind('https://steamdt.com/cs2/tracker')).toBe('other');
   });

@@ -103,7 +103,7 @@ function getCurrentPageContextKey(): string {
   const pageKind = currentAdapter?.name === 'steamdt'
     ? getSteamdtPageKind(window.location.href, document.title)
     : 'default';
-  return [adapterName, pageKind, window.location.pathname, document.title].join('::');
+  return [adapterName, pageKind, window.location.pathname, window.location.search, document.title].join('::');
 }
 
 function resetPageState(reason: string) {

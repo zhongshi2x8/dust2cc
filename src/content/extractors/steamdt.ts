@@ -31,6 +31,14 @@ export class SteamdtExtractor implements SiteAdapter {
 
   /** Try to extract itemId from Nuxt hydration data */
   getItemId(): string | null {
+    const currentRecord = this.findCurrentPageHydrationRecord();
+    if (currentRecord) {
+      const recordItemId = currentRecord.itemId ?? currentRecord.id ?? currentRecord.goodsId;
+      if (typeof recordItemId === 'string' || typeof recordItemId === 'number') {
+        return String(recordItemId);
+      }
+    }
+
     try {
       const nuxtData = (window as unknown as Record<string, unknown>).__NUXT__;
       if (nuxtData && typeof nuxtData === 'object') {
@@ -55,11 +63,49 @@ export class SteamdtExtractor implements SiteAdapter {
   extractGoodsInfo(): GoodsInfo | null {
     const pageKind = getSteamdtPageKind(window.location.href, document.title);
     if (pageKind === 'market-index') {
+      const marketRecord = this.findCurrentPageHydrationRecord();
+      const recordName =
+        typeof marketRecord?.name === 'string' && marketRecord.name.trim()
+          ? marketRecord.name.trim()
+          : null;
+      const marketType = this.getSteamdtSectionType();
       return {
-        id: 'steamdt-market-index',
-        name: 'SteamDT 大盘指数',
+        id: `steamdt-market-index-${marketType || 'default'}`,
+        name: recordName ? `SteamDT ${recordName}指数` : 'SteamDT 大盘指数',
         source: 'steamdt',
       };
+    }
+
+    const currentRecord = this.findCurrentPageHydrationRecord();
+    if (currentRecord) {
+      const resolvedName = [
+        currentRecord.name,
+        currentRecord.shortName,
+        currentRecord.marketHashName,
+        currentRecord.marketShortName,
+      ].find((value) => typeof value === 'string' && value.trim()) as string | undefined;
+
+      if (resolvedName) {
+        const resolvedIdCandidate = currentRecord.itemId ?? currentRecord.id ?? currentRecord.goodsId;
+        const resolvedId =
+          resolvedIdCandidate !== undefined && resolvedIdCandidate !== null
+            ? resolvedIdCandidate
+            : (this.getItemId() || '');
+        return {
+          id: String(resolvedId),
+          name: resolvedName,
+          zhName: typeof currentRecord.shortName === 'string' ? currentRecord.shortName :
+                  typeof currentRecord.cnName === 'string' ? currentRecord.cnName : undefined,
+          weapon: typeof currentRecord.weapon === 'string' ? currentRecord.weapon : undefined,
+          rarity: typeof currentRecord.rarity === 'string' ? currentRecord.rarity :
+                  typeof currentRecord.rarityName === 'string' ? currentRecord.rarityName : undefined,
+          wear: typeof currentRecord.exteriorName === 'string' ? currentRecord.exteriorName :
+                typeof currentRecord.exterior === 'string' ? currentRecord.exterior : undefined,
+          iconUrl: typeof currentRecord.iconUrl === 'string' ? currentRecord.iconUrl :
+                   typeof currentRecord.imageUrl === 'string' ? currentRecord.imageUrl : undefined,
+          source: 'steamdt',
+        };
+      }
     }
 
     // Strategy 1: From page title
@@ -117,13 +163,13 @@ export class SteamdtExtractor implements SiteAdapter {
 
     if (domPrice && nuxtPrice) {
       if (!isPriceAlignedWithReference(nuxtPrice.current, domPrice.current, 0.2)) {
-        return domPrice;
+        return nuxtPrice;
       }
 
       return {
-        current: domPrice.current,
+        current: nuxtPrice.current,
         currency: 'CNY',
-        changePercent24h: domPrice.changePercent24h ?? nuxtPrice.changePercent24h,
+        changePercent24h: nuxtPrice.changePercent24h ?? domPrice.changePercent24h,
       };
     }
 
@@ -132,42 +178,204 @@ export class SteamdtExtractor implements SiteAdapter {
 
   private extractPriceFromNuxt(referencePrice?: number): PriceInfo | null {
     try {
-      const nuxtData = (window as unknown as Record<string, unknown>).__NUXT__;
-      if (!nuxtData || typeof nuxtData !== 'object') return null;
+      const pageKind = getSteamdtPageKind(window.location.href, document.title);
+      const currentRecord = this.findCurrentPageHydrationRecord();
+      const source = currentRecord ?? this.getHydrationData();
+      if (!source || typeof source !== 'object') return null;
 
-      const current = pickBestPriceCandidate(
-        [
-          { value: this.parseNumber(this.deepFind(nuxtData, 'currentPrice')), weight: 20 },
-          { value: this.parseNumber(this.deepFind(nuxtData, 'sellMinPrice')), weight: 18 },
-          { value: this.parseNumber(this.deepFind(nuxtData, 'lowestPrice')), weight: 16 },
-          { value: this.parseNumber(this.deepFind(nuxtData, 'minPrice')), weight: 14 },
-          { value: this.parseNumber(this.deepFind(nuxtData, 'lastPrice')), weight: 12 },
-          { value: this.parseNumber(this.deepFind(nuxtData, 'steamPrice')), weight: 10 },
-          { value: this.parseNumber(this.deepFind(nuxtData, 'buffPrice')), weight: 8 },
-          { value: this.parseNumber(this.deepFind(nuxtData, 'price')), weight: 4 },
-        ],
-        referencePrice,
-      )?.value;
+      const currentCandidates =
+        pageKind === 'market-index'
+          ? [
+              { value: this.parseNumber(this.readNestedValue(source, 'index')), weight: 28 },
+              { value: this.parseNumber(this.readNestedValue(source, 'yesterdayIndex')), weight: 10 },
+              { value: this.parseNumber(this.readNestedValue(source, 'highIndex')), weight: 8 },
+              { value: this.parseNumber(this.readNestedValue(source, 'lowIndex')), weight: 8 },
+            ]
+          : [
+              { value: this.parseNumber(this.readNestedValue(source, 'lowestPrice')), weight: 30 },
+              { value: this.parseNumber(this.readNestedValue(source, 'sellMinPrice')), weight: 24 },
+              { value: this.parseNumber(this.readNestedValue(source, 'currentPrice')), weight: 20 },
+              { value: this.parseNumber(this.readNestedValue(source, 'consignmentBest.price')), weight: 18 },
+              { value: this.parseNumber(this.readNestedValue(source, 'sellingPriceList.0.price')), weight: 14 },
+              { value: this.parseNumber(this.readNestedValue(source, 'purchaseBest.price')), weight: 10 },
+              { value: this.parseNumber(this.readNestedValue(source, 'sellPrice')), weight: 8 },
+              { value: this.parseNumber(this.readNestedValue(source, 'price')), weight: 4 },
+            ];
+
+      const current = pickBestPriceCandidate(currentCandidates, referencePrice)?.value;
 
       if (current === undefined || current <= 0 || current >= 10_000_000) {
         return null;
       }
 
+      const changeCandidates =
+        pageKind === 'market-index'
+          ? [
+              this.parseNumber(this.readNestedValue(source, 'riseFallRate')),
+              this.parseNumber(this.readNestedValue(source, 'changePercent24h')),
+            ]
+          : [
+              this.parseNumber(this.readNestedValue(source, 'diff1Day')),
+              this.parseNumber(this.readNestedValue(source, 'changePercent24h')),
+              this.parseNumber(this.readNestedValue(source, 'priceChangePercent')),
+              this.parseNumber(this.readNestedValue(source, 'ratio24h')),
+              this.parseNumber(this.readNestedValue(source, 'price_change_percent')),
+            ];
+
       return {
         current,
         currency: 'CNY',
-        changePercent24h: pickBestPriceCandidate(
-          [
-            { value: this.parseNumber(this.deepFind(nuxtData, 'changePercent24h')), weight: 14 },
-            { value: this.parseNumber(this.deepFind(nuxtData, 'priceChangePercent')), weight: 12 },
-            { value: this.parseNumber(this.deepFind(nuxtData, 'ratio24h')), weight: 10 },
-            { value: this.parseNumber(this.deepFind(nuxtData, 'price_change_percent')), weight: 8 },
-          ],
-        )?.value,
+        changePercent24h: changeCandidates.find((value) => typeof value === 'number' && Number.isFinite(value)),
       };
     } catch {
       return null;
     }
+  }
+
+  private getSteamdtSectionType(): string | null {
+    try {
+      const parsed = new URL(window.location.href);
+      const type = parsed.searchParams.get('type');
+      return type ? type.toUpperCase() : null;
+    } catch {
+      return null;
+    }
+  }
+
+  private getHydrationData(): unknown {
+    const script = document.getElementById('__NUXT_DATA__');
+    const scriptText = script?.textContent?.trim();
+    if (scriptText) {
+      try {
+        return JSON.parse(scriptText);
+      } catch {
+        // Ignore malformed hydration payloads.
+      }
+    }
+
+    const nuxtData = (window as unknown as Record<string, unknown>).__NUXT__;
+    return nuxtData && typeof nuxtData === 'object' ? nuxtData : null;
+  }
+
+  private findCurrentPageHydrationRecord(): Record<string, unknown> | null {
+    const root = this.getHydrationData();
+    if (!root || typeof root !== 'object') return null;
+
+    const pageKind = getSteamdtPageKind(window.location.href, document.title);
+    const itemNameCandidates = [
+      this.getItemNameFromUrl(),
+      this.extractFromTitle(),
+      document.querySelector('h1')?.textContent?.trim() || null,
+    ]
+      .filter((value): value is string => !!value)
+      .map((value) => this.normalizeIdentityText(value));
+
+    const sectionType = this.getSteamdtSectionType();
+    let bestRecord: Record<string, unknown> | null = null;
+    let bestScore = Number.NEGATIVE_INFINITY;
+    const seen = new WeakSet<object>();
+
+    const visit = (value: unknown, depth = 0) => {
+      if (depth > 8 || !value || typeof value !== 'object') return;
+      if (seen.has(value as object)) return;
+      seen.add(value as object);
+
+      if (!Array.isArray(value)) {
+        const record = value as Record<string, unknown>;
+        const score = this.scoreHydrationRecord(record, pageKind, itemNameCandidates, sectionType);
+        if (score > bestScore) {
+          bestScore = score;
+          bestRecord = record;
+        }
+      }
+
+      for (const child of Object.values(value as Record<string, unknown>)) {
+        visit(child, depth + 1);
+      }
+    };
+
+    visit(root);
+    return bestScore >= 20 ? bestRecord : null;
+  }
+
+  private scoreHydrationRecord(
+    record: Record<string, unknown>,
+    pageKind: 'item-detail' | 'market-index' | 'other',
+    itemNameCandidates: string[],
+    sectionType: string | null,
+  ): number {
+    let score = 0;
+    const recordName = this.normalizeIdentityText(
+      [
+        record.marketHashName,
+        record.name,
+        record.shortName,
+        record.marketShortName,
+      ].find((value) => typeof value === 'string' && value.trim()) as string | undefined,
+    );
+
+    if (pageKind === 'market-index') {
+      if (typeof record.type === 'string' && sectionType && record.type.toUpperCase() === sectionType) score += 40;
+      if (typeof record.name === 'string' && /大盘|指数|板块/.test(record.name)) score += 18;
+      if (typeof record.index !== 'undefined') score += 26;
+      if (typeof record.yesterdayIndex !== 'undefined') score += 10;
+      if (typeof record.highIndex !== 'undefined') score += 8;
+      if (typeof record.lowIndex !== 'undefined') score += 8;
+      if (typeof record.marketHashName === 'string' || typeof record.lowestPrice !== 'undefined') score -= 20;
+      return score;
+    }
+
+    if (pageKind !== 'item-detail') return Number.NEGATIVE_INFINITY;
+
+    if (recordName && itemNameCandidates.some((candidate) => candidate === recordName || candidate.includes(recordName) || recordName.includes(candidate))) {
+      score += 36;
+    }
+    if (typeof record.itemId !== 'undefined' || typeof record.id !== 'undefined') score += 8;
+    if (typeof record.lowestPrice !== 'undefined') score += 28;
+    if (typeof record.sellMinPrice !== 'undefined') score += 24;
+    if (typeof record.consignmentBest !== 'undefined') score += 18;
+    if (Array.isArray(record.sellingPriceList)) score += 16;
+    if (typeof record.purchaseBest !== 'undefined') score += 10;
+    if (typeof record.platformName === 'string') score -= 16;
+    if (typeof record.platform === 'string') score -= 8;
+    if (typeof record.index !== 'undefined') score -= 24;
+
+    return score;
+  }
+
+  private normalizeIdentityText(value?: string): string {
+    if (!value) return '';
+    return value
+      .toLowerCase()
+      .replace(/\s*[-_|]\s*steamdt.*$/i, '')
+      .replace(/\s*[-_|]\s*cs2.*$/i, '')
+      .replace(/[（）()]/g, ' ')
+      .replace(/久经沙场/g, 'field-tested')
+      .replace(/略有磨损/g, 'minimal wear')
+      .replace(/破损不堪/g, 'well-worn')
+      .replace(/战痕累累/g, 'battle-scarred')
+      .replace(/崭新出厂/g, 'factory new')
+      .replace(/\s+/g, ' ')
+      .trim();
+  }
+
+  private readNestedValue(source: unknown, path: string): unknown {
+    if (!source || typeof source !== 'object' || !path) return undefined;
+
+    const segments = path.split('.');
+    let current: unknown = source;
+    for (const segment of segments) {
+      if (Array.isArray(current)) {
+        const index = Number(segment);
+        current = Number.isInteger(index) ? current[index] : undefined;
+      } else if (current && typeof current === 'object') {
+        current = (current as Record<string, unknown>)[segment];
+      } else {
+        return undefined;
+      }
+    }
+
+    return current;
   }
 
   private extractPriceFromDom(): PriceInfo | null {
@@ -682,6 +890,9 @@ export function getSteamdtPageKind(
     if (!/steamdt\.com$/i.test(parsed.hostname)) return 'other';
 
     const pathname = decodeURIComponent(parsed.pathname);
+    if (pathname === '/section' && (parsed.searchParams.get('type') || /大盘|指数|板块/i.test(title))) {
+      return 'market-index';
+    }
     if (pathname === '/' && /大盘|指数|inventory|价格走势/i.test(title)) {
       return 'market-index';
     }
