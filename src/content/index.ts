@@ -13,6 +13,7 @@ import type {
 import { calcMA, computeAllIndicators } from '@shared/indicators';
 import { buildLocalAnalysisMarkdown } from '@shared/local-analysis';
 import { buildAnalysisFingerprint } from '@shared/analysis-fingerprint';
+import { getVisibleChartMarkerPoints } from '@shared/chart-markers';
 import { detectAllPatterns } from '@shared/patterns';
 import { buildKlineAnalysisPrompt } from '@shared/prompts/kline-analysis';
 import { generateQuickSignal } from '@shared/prompts/trade-signal';
@@ -986,13 +987,8 @@ function annotateChart(signal: TradeSignal, indicators: IndicatorResult) {
     }, '*');
   }
 
-  const markerKinds =
-    currentAdapter?.name === 'steamdt'
-      ? new Set(['buy_zone', 'stop_loss', 'support', 'resistance'])
-      : null;
-
-  const markerPoints: ChartMarkerPoint[] = points
-    .filter((p) => !markerKinds || markerKinds.has(p.kind))
+  const visibleMarkerPoints = getVisibleChartMarkerPoints(currentAdapter?.name, points);
+  const markerPoints: ChartMarkerPoint[] = visibleMarkerPoints
     .map((p) => ({
       kind: p.kind,
       label: p.label,
