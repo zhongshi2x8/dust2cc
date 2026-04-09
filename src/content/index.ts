@@ -25,6 +25,7 @@ import {
   pickBestPriceCandidate,
   pickPreferredObservedPrice,
   resolveBestAnalysisPrice,
+  shouldRetainKlineDespitePriceMismatch,
 } from '@shared/price-selection';
 import { getSettings } from '@shared/storage';
 import { getAdapterForUrl } from './extractors/base';
@@ -489,9 +490,9 @@ function syncStateFromDom() {
       0.25,
     )
   ) {
-    if (preferredKlineSource === 'echarts' && acceptedKlineScore >= 80) {
+    if (shouldRetainKlineDespitePriceMismatch(preferredKlineSource, acceptedKlineScore)) {
       setDebugState({
-        lastIssue: '页面价格源短暂波动，已保留当前锁定的主图 K 线',
+        lastIssue: '页面价格与已抓取 K 线不一致，已优先保留当前 K 线继续分析',
       });
     } else {
       state.kline = [];

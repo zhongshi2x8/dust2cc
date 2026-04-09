@@ -6,6 +6,7 @@ import {
   pickBestPriceCandidate,
   pickPreferredObservedPrice,
   resolveBestAnalysisPrice,
+  shouldRetainKlineDespitePriceMismatch,
 } from './price-selection';
 
 describe('pickBestPriceCandidate', () => {
@@ -87,5 +88,19 @@ describe('resolveBestAnalysisPrice', () => {
 
   it('keeps the current price when it is aligned with the reference close', () => {
     expect(resolveBestAnalysisPrice(35988, 35989.5)).toBe(35988);
+  });
+});
+
+describe('shouldRetainKlineDespitePriceMismatch', () => {
+  it('retains an echarts kline even when page price mismatches', () => {
+    expect(shouldRetainKlineDespitePriceMismatch('echarts', 12)).toBe(true);
+  });
+
+  it('retains an already accepted network kline instead of clearing analysis state', () => {
+    expect(shouldRetainKlineDespitePriceMismatch('network', 42)).toBe(true);
+  });
+
+  it('does not retain kline when nothing has ever been accepted', () => {
+    expect(shouldRetainKlineDespitePriceMismatch(null, Number.NEGATIVE_INFINITY)).toBe(false);
   });
 });

@@ -133,3 +133,11 @@ export function resolveBestAnalysisPrice(
     0
   );
 }
+
+export function shouldRetainKlineDespitePriceMismatch(
+  source: 'network' | 'echarts' | null,
+  acceptedScore: number,
+): boolean {
+  if (source === 'echarts') return true;
+  return Number.isFinite(acceptedScore) && acceptedScore > Number.NEGATIVE_INFINITY;
+}
