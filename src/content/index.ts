@@ -225,6 +225,10 @@ function normalizeKlineData(raw: unknown): KlinePoint[] {
   }
 
   if (Array.isArray(nested)) {
+    if (Array.isArray(nested[0])) {
+      return synthesizeOhlcFromTupleList(nested as unknown[][]);
+    }
+
     // Check if this is a trendList (SteamDT-style: single price per point, no OHLC)
     const first = nested[0] as Record<string, unknown> | undefined;
     if (first && !('open' in first) && !('o' in first) && ('price' in first || 'avgPrice' in first || 'closePrice' in first)) {
@@ -275,6 +279,67 @@ function synthesizeOhlcFromPriceList(list: Record<string, unknown>[]): KlinePoin
   }
 
   return sanitizeKlineData(points);
+}
+
+function synthesizeOhlcFromTupleList(list: unknown[][]): KlinePoint[] {
+  const points: KlinePoint[] = [];
+
+  for (let i = 0; i < list.length; i++) {
+    const tuple = list[i];
+    if (!Array.isArray(tuple) || tuple.length < 2) continue;
+
+    const timestamp = tuple[0];
+    const sellPrice = Number(tuple[1] ?? 0);
+    const sellCount = Number(tuple[2] ?? 0);
+    const biddingPrice = Number(tuple[3] ?? 0);
+    const biddingCount = Number(tuple[4] ?? 0);
+    const transactionAmount = Number(tuple[5] ?? 0);
+    const transactionCount = Number(tuple[6] ?? 0);
+
+    const priceCandidates = [sellPrice, biddingPrice].filter((value) => Number.isFinite(value) && value > 0);
+    const closePrice = priceCandidates[0] ?? 0;
+    if (!closePrice) continue;
+
+    const previousTuple = i > 0 ? list[i - 1] : null;
+    const previousSellPrice = previousTuple ? Number(previousTuple[1] ?? 0) : closePrice;
+    const previousBidPrice = previousTuple ? Number(previousTuple[3] ?? 0) : closePrice;
+    const previousPriceCandidates = [previousSellPrice, previousBidPrice].filter(
+      (value) => Number.isFinite(value) && value > 0,
+    );
+    const openPrice = previousPriceCandidates[0] ?? closePrice;
+    const high = Math.max(...priceCandidates, ...previousPriceCandidates, closePrice, openPrice);
+    const low = Math.min(...priceCandidates, ...previousPriceCandidates, closePrice, openPrice);
+
+    points.push({
+      date: normalizeTupleTimestamp(timestamp, i),
+      open: openPrice,
+      high,
+      low,
+      close: closePrice,
+      volume: transactionCount || sellCount || biddingCount || transactionAmount || 0,
+    });
+  }
+
+  return sanitizeKlineData(points);
+}
+
+function normalizeTupleTimestamp(value: unknown, index: number): string {
+  if (typeof value === 'number' && Number.isFinite(value) && value > 0) {
+    const millis = value > 1_000_000_000_000 ? value : value * 1000;
+    return new Date(millis).toISOString();
+  }
+
+  if (typeof value === 'string' && value.trim()) {
+    const numeric = Number(value);
+    if (Number.isFinite(numeric) && numeric > 0) {
+      const millis = numeric > 1_000_000_000_000 ? numeric : numeric * 1000;
+      return new Date(millis).toISOString();
+    }
+
+    return value;
+  }
+
+  return `tuple-${index}`;
 }
 
 function sanitizeKlineData(points: KlinePoint[]): KlinePoint[] {

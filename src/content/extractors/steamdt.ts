@@ -594,7 +594,7 @@ export class SteamdtExtractor implements SiteAdapter {
 }
 
 /** Normalize SteamDT trend data to KlinePoint[] */
-function normalizeSteamdtTrendResponse(raw: unknown): KlinePoint[] {
+export function normalizeSteamdtTrendResponse(raw: unknown): KlinePoint[] {
   if (!raw || typeof raw !== 'object') return [];
 
   const data = raw as Record<string, unknown>;
@@ -611,6 +611,30 @@ function normalizeSteamdtTrendResponse(raw: unknown): KlinePoint[] {
 
   if (!Array.isArray(trendList)) return [];
 
+  if (Array.isArray(trendList[0])) {
+    return trendList
+      .filter((item: unknown) => Array.isArray(item) && item.length >= 2)
+      .map((item: unknown, index) => {
+        const tuple = item as unknown[];
+        const timestamp = tuple[0];
+        const sellPrice = Number(tuple[1] ?? 0);
+        const biddingPrice = Number(tuple[3] ?? 0);
+        const close = sellPrice || biddingPrice || 0;
+        const previousTuple = index > 0 && Array.isArray(trendList[index - 1]) ? trendList[index - 1] as unknown[] : null;
+        const previousClose = previousTuple ? Number(previousTuple[1] ?? previousTuple[3] ?? close) : close;
+
+        return {
+          date: normalizeSteamdtTupleTimestamp(timestamp, index),
+          open: previousClose,
+          high: Math.max(close, previousClose, sellPrice || close, biddingPrice || close),
+          low: Math.min(close, previousClose, sellPrice || close, biddingPrice || close),
+          close,
+          volume: Number(tuple[6] ?? tuple[2] ?? tuple[4] ?? tuple[5] ?? 0),
+        };
+      })
+      .filter((point) => point.close > 0);
+  }
+
   return trendList
     .filter((item: unknown) => item && typeof item === 'object')
     .map((item: Record<string, unknown>) => ({
@@ -624,6 +648,25 @@ function normalizeSteamdtTrendResponse(raw: unknown): KlinePoint[] {
       close: Number(item.close || item.closePrice || item.c || item.price || item.avgPrice || 0),
       volume: Number(item.volume || item.vol || item.v || item.tradeNum || item.count || 0),
     }));
+}
+
+function normalizeSteamdtTupleTimestamp(value: unknown, index: number): string {
+  if (typeof value === 'number' && Number.isFinite(value) && value > 0) {
+    const millis = value > 1_000_000_000_000 ? value : value * 1000;
+    return new Date(millis).toISOString();
+  }
+
+  if (typeof value === 'string' && value.trim()) {
+    const parsed = Number(value);
+    if (Number.isFinite(parsed) && parsed > 0) {
+      const millis = parsed > 1_000_000_000_000 ? parsed : parsed * 1000;
+      return new Date(millis).toISOString();
+    }
+
+    return value;
+  }
+
+  return `tuple-${index}`;
 }
 
 /** Normalize SteamDT item detail to GoodsInfo */

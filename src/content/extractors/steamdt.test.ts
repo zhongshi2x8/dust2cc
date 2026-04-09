@@ -2,7 +2,7 @@
 // @vitest-environment-options {"url":"https://steamdt.com/cs2/AK-47%20%7C%20Redline%20(Field-Tested)"}
 
 import { beforeEach, describe, expect, it } from 'vitest';
-import { steamdtExtractor } from './steamdt';
+import { normalizeSteamdtTrendResponse, steamdtExtractor } from './steamdt';
 
 declare global {
   interface Window {
@@ -147,5 +147,20 @@ describe('steamdtExtractor.extractPrice', () => {
     mockRect(document.querySelector('.sidebar-chart'), { top: 380, left: 1190, width: 160, height: 100 });
 
     expect(steamdtExtractor.getChartAnchor()?.className).toContain('market-trend-card');
+  });
+
+  it('normalizes steamdt tuple-based trend arrays into synthetic OHLC points', () => {
+    const points = normalizeSteamdtTrendResponse({
+      data: [
+        [1775747860, 463.2, 10, 460.5, 4, 12000, 6],
+        [1775834260, 464.8, 12, 462.1, 5, 15000, 8],
+      ],
+    });
+
+    expect(points).toHaveLength(2);
+    expect(points[0].close).toBe(463.2);
+    expect(points[1].open).toBe(463.2);
+    expect(points[1].close).toBe(464.8);
+    expect(points[1].volume).toBe(8);
   });
 });
