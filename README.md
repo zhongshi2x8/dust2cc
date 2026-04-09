@@ -27,13 +27,19 @@
 
 推荐直接下载发布好的 `dist.zip`，不用自己装 Node.js，也不用自己构建。
 
-1. 打开仓库的 [Releases](https://github.com/zhongshi2x8/dust2cc/releases)
-2. 下载最新版本里的 `dist.zip`
-3. 解压 `dist.zip`
-4. 打开 Chrome，进入 `chrome://extensions`
-5. 打开右上角“开发者模式”
-6. 点击“加载已解压的扩展程序”
-7. 选择刚刚解压出来的 `dist` 文件夹
+直接下载：
+
+- [点击下载 dist.zip](https://github.com/zhongshi2x8/dust2cc/releases/latest/download/dist.zip)
+- [查看全部版本](https://github.com/zhongshi2x8/dust2cc/releases)
+
+安装步骤：
+
+1. 点击上面的 `dist.zip` 下载链接
+2. 解压 `dist.zip`
+3. 打开 Chrome，进入 `chrome://extensions`
+4. 打开右上角“开发者模式”
+5. 点击“加载已解压的扩展程序”
+6. 选择刚刚解压出来的 `dist` 文件夹
 
 注意：
 
@@ -101,17 +107,19 @@ release/dist.zip
 4. 点击“加载已解压的扩展程序”
 5. 选择项目下的 `dist` 目录
 
-## 🚀 发布 `dist.zip`
+## 🚀 维护者发布
 
-如果你是仓库维护者，推荐按下面的方式发版本：
+如果你是仓库维护者，执行下面这条命令即可生成发布包：
 
-1. 本地执行 `npm run package`
-2. 确认生成了 `release/dist.zip`
-3. 去 GitHub 仓库创建一个新的 Release
-4. 把 `release/dist.zip` 作为附件上传
-5. 在 Release 说明里告诉用户“下载 `dist.zip` 后解压加载”
+```bash
+npm run package
+```
 
-这样小白用户只需要进 Releases 下载 `dist.zip`，不用自己构建项目。
+生成好的文件在：
+
+```bash
+release/dist.zip
+```
 
 ## 📄 License
 
