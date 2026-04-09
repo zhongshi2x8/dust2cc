@@ -10,6 +10,11 @@ export class SteamdtExtractor implements SiteAdapter {
   name = 'steamdt' as const;
   matchUrl = /steamdt\.com\//;
 
+  canAnalyzeUrl(url: string): boolean {
+    const kind = getSteamdtPageKind(url);
+    return kind === 'item-detail' || kind === 'market-index';
+  }
+
   /** Extract item name from URL path (encoded market_hash_name) */
   getItemNameFromUrl(): string | null {
     // URL pattern: /cs2/★ Sport Gloves | Hedge Maze (Field-Tested)
@@ -48,6 +53,15 @@ export class SteamdtExtractor implements SiteAdapter {
   }
 
   extractGoodsInfo(): GoodsInfo | null {
+    const pageKind = getSteamdtPageKind(window.location.href, document.title);
+    if (pageKind === 'market-index') {
+      return {
+        id: 'steamdt-market-index',
+        name: 'SteamDT 大盘指数',
+        source: 'steamdt',
+      };
+    }
+
     // Strategy 1: From page title
     const titleName = this.extractFromTitle();
     if (titleName) {
@@ -654,3 +668,49 @@ function normalizeSteamdtDetailResponse(raw: unknown): GoodsInfo | null {
 }
 
 export const steamdtExtractor = new SteamdtExtractor();
+
+export function isSteamdtDetailUrl(url: string): boolean {
+  return getSteamdtPageKind(url) === 'item-detail';
+}
+
+export function getSteamdtPageKind(
+  url: string,
+  title: string = typeof document !== 'undefined' ? document.title : '',
+): 'item-detail' | 'market-index' | 'other' {
+  try {
+    const parsed = new URL(url);
+    if (!/steamdt\.com$/i.test(parsed.hostname)) return 'other';
+
+    const pathname = decodeURIComponent(parsed.pathname);
+    if (pathname === '/' && /大盘|指数|inventory|价格走势/i.test(title)) {
+      return 'market-index';
+    }
+
+    const match = pathname.match(/^\/cs2\/(.+)$/);
+    if (!match) return 'other';
+
+    const slug = match[1].trim().toLowerCase();
+    if (!slug) return 'other';
+
+    const reservedRoutes = new Set([
+      'market',
+      'mkt',
+      'tracker',
+      'inventory',
+      'my',
+      'terms',
+      'login',
+      'register',
+      'search',
+      'article',
+      'upgrade',
+      'case',
+      'ranking',
+      'statistics',
+    ]);
+
+    return reservedRoutes.has(slug) ? 'other' : 'item-detail';
+  } catch {
+    return 'other';
+  }
+}

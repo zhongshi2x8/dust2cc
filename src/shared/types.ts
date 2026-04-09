@@ -202,6 +202,7 @@ export type SiteName = 'csqaq' | 'buff' | 'youpin' | 'steamdt';
 export interface SiteAdapter {
   name: SiteName;
   matchUrl: RegExp;
+  canAnalyzeUrl?(url: string): boolean;
   extractGoodsInfo(): GoodsInfo | null;
   extractPrice(): PriceInfo | null;
   getPanelAnchor?(): HTMLElement | null;

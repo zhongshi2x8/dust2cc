@@ -28,6 +28,7 @@ import {
 } from '@shared/price-selection';
 import { getSettings } from '@shared/storage';
 import { getAdapterForUrl } from './extractors/base';
+import { getSteamdtPageKind } from './extractors/steamdt';
 import { DOMWatcher } from './observers/dom-watcher';
 import { injectPanel, injectSignalBadge, updateSignalBadge, renderChartMarkers } from './injector/panel';
 import type { ChartMarkerPoint } from './injector/panel';
@@ -84,9 +85,53 @@ let pageHooksInstalled = false;
 let autoAnalysisKey = '';
 let preferredKlineSource: 'network' | 'echarts' | null = null;
 let acceptedKlineScore = Number.NEGATIVE_INFINITY;
+let pageContextKey = '';
 
 function supportsInlinePanel() {
-  return !!currentAdapter;
+  return isCurrentPageAnalyzable();
+}
+
+function isCurrentPageAnalyzable(): boolean {
+  return !!currentAdapter && (
+    typeof currentAdapter.canAnalyzeUrl !== 'function' ||
+    currentAdapter.canAnalyzeUrl(window.location.href)
+  );
+}
+
+function getCurrentPageContextKey(): string {
+  const adapterName = currentAdapter?.name ?? 'none';
+  const pageKind = currentAdapter?.name === 'steamdt'
+    ? getSteamdtPageKind(window.location.href, document.title)
+    : 'default';
+  return [adapterName, pageKind, window.location.pathname, document.title].join('::');
+}
+
+function resetPageState(reason: string) {
+  state.goodsInfo = null;
+  state.price = null;
+  state.kline = [];
+  preferredKlineSource = null;
+  acceptedKlineScore = Number.NEGATIVE_INFINITY;
+  autoAnalysisKey = '';
+  debugState.panel = 'pending';
+  debugState.anchor = 'missing';
+  debugState.lastCapture = '尚未抓到任何数据';
+  debugState.captureCount = 0;
+  debugState.lastIssue = reason;
+  updateDebugBar();
+}
+
+function ensureFreshPageContext(reason = '页面上下文切换后重新等待抓取') {
+  const nextKey = getCurrentPageContextKey();
+  if (!pageContextKey) {
+    pageContextKey = nextKey;
+    return;
+  }
+
+  if (pageContextKey !== nextKey) {
+    pageContextKey = nextKey;
+    resetPageState(reason);
+  }
 }
 
 function init() {
@@ -147,6 +192,11 @@ function injectPageScript() {
 }
 
 function handleCapturedData(payload: { type: string; data: unknown }) {
+  ensureFreshPageContext();
+  if (!isCurrentPageAnalyzable()) {
+    return;
+  }
+
   switch (payload.type) {
     case 'kline':
     case 'echarts_kline':
@@ -260,6 +310,17 @@ function unwrapPayload(raw: unknown): unknown {
 function onContentReady() {
   currentAdapter = getAdapterForUrl(window.location.href);
   if (!currentAdapter) return;
+  ensureFreshPageContext();
+
+  if (!isCurrentPageAnalyzable()) {
+    document.getElementById(PANEL_ID)?.remove();
+    setDebugState({
+      panel: 'pending',
+      anchor: 'missing',
+      lastIssue: '当前页面不是支持分析的 steamdt 单品页或大盘指数页',
+    });
+    return;
+  }
 
   syncStateFromDom();
 
@@ -325,6 +386,7 @@ function onContentReady() {
 
 function syncStateFromDom() {
   if (!currentAdapter) return;
+  ensureFreshPageContext();
 
   const domGoodsInfo = currentAdapter.extractGoodsInfo();
   if (domGoodsInfo) {
@@ -363,19 +425,8 @@ function syncStateFromDom() {
 function onNavigation() {
   currentAdapter = getAdapterForUrl(window.location.href);
   document.getElementById(PANEL_ID)?.remove();
-
-  state.goodsInfo = null;
-  state.price = null;
-  state.kline = [];
-  preferredKlineSource = null;
-  acceptedKlineScore = Number.NEGATIVE_INFINITY;
-  autoAnalysisKey = '';
-  debugState.panel = 'pending';
-  debugState.anchor = 'missing';
-  debugState.lastCapture = '尚未抓到任何数据';
-  debugState.captureCount = 0;
-  debugState.lastIssue = '页面切换后重新等待抓取';
-  updateDebugBar();
+  pageContextKey = getCurrentPageContextKey();
+  resetPageState('页面切换后重新等待抓取');
 
   if (currentAdapter) {
     setTimeout(() => onContentReady(), 800);
@@ -454,6 +505,15 @@ async function runAnalysis(shadow: ShadowRoot) {
   const signalArea = shadow.getElementById('signal-area');
   const indicatorsArea = shadow.getElementById('indicators-area');
   if (!analysisArea || !analysisStatic || !analysisStream || !signalArea || !indicatorsArea) return;
+
+  if (!isCurrentPageAnalyzable()) {
+    analysisStatic.innerHTML = '<p class="placeholder">⚠️ 当前 steamdt 页面不是支持分析的单品页或大盘指数页，暂不支持分析。</p>';
+    analysisStream.classList.add('hidden');
+    setDebugState({
+      lastIssue: '已跳过不支持的 steamdt 页面分析请求',
+    });
+    return;
+  }
 
   if (state.kline.length < 5) {
     setDebugState({
@@ -543,6 +603,7 @@ async function runAnalysis(shadow: ShadowRoot) {
 }
 
 function maybeAutoAnalyze() {
+  if (!isCurrentPageAnalyzable()) return;
   if (state.kline.length < 5) return;
 
   const nextKey = buildAnalysisFingerprint(getPageSnapshot());
@@ -702,6 +763,9 @@ function getReferenceClosePrice(): number | undefined {
 function resolveAnalysisPrice(priceInfo: PriceInfo | null): number {
   const referenceClose = getReferenceClosePrice();
   const observedCurrent = currentAdapter?.extractPrice()?.current;
+  if (currentAdapter?.name === 'steamdt' && getSteamdtPageKind(window.location.href, document.title) === 'market-index') {
+    return referenceClose ?? observedCurrent ?? priceInfo?.current ?? 0;
+  }
   return resolveBestAnalysisPrice(priceInfo?.current, referenceClose, observedCurrent);
 }
 

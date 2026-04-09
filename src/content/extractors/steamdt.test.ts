@@ -2,7 +2,7 @@
 // @vitest-environment-options {"url":"https://steamdt.com/cs2/AK-47%20%7C%20Redline%20(Field-Tested)"}
 
 import { beforeEach, describe, expect, it } from 'vitest';
-import { normalizeSteamdtTrendResponse, steamdtExtractor } from './steamdt';
+import { getSteamdtPageKind, isSteamdtDetailUrl, normalizeSteamdtTrendResponse, steamdtExtractor } from './steamdt';
 
 declare global {
   interface Window {
@@ -204,5 +204,12 @@ describe('steamdtExtractor.extractPrice', () => {
     expect(points[1].open).toBe(463.2);
     expect(points[1].close).toBe(464.8);
     expect(points[1].volume).toBe(8);
+  });
+
+  it('classifies steamdt item and index pages correctly', () => {
+    expect(isSteamdtDetailUrl('https://steamdt.com/cs2/AK-47%20%7C%20Redline%20(Field-Tested)')).toBe(true);
+    expect(getSteamdtPageKind('https://steamdt.com/', 'SteamDT-CS饰品价格走势_CS2市场大盘_饰品指数')).toBe('market-index');
+    expect(getSteamdtPageKind('https://steamdt.com/cs2/market')).toBe('other');
+    expect(getSteamdtPageKind('https://steamdt.com/cs2/tracker')).toBe('other');
   });
 });
