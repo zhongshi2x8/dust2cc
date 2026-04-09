@@ -3,6 +3,7 @@ import {
   detectTupleKlineFormat,
   normalizePriceLikeKlineRecords,
   normalizeTupleKlineList,
+  sanitizeKlinePoints,
 } from './kline-normalization';
 
 describe('detectTupleKlineFormat', () => {
@@ -63,5 +64,33 @@ describe('normalizePriceLikeKlineRecords', () => {
     expect(points[1].open).toBe(463.2);
     expect(points[1].close).toBe(464.8);
     expect(points[1].volume).toBe(8);
+  });
+});
+
+describe('sanitizeKlinePoints', () => {
+  it('drops a trailing extreme outlier point that would corrupt the latest price scale', () => {
+    const base = Array.from({ length: 24 }, (_, index) => ({
+      date: `2026-04-${String(index + 1).padStart(2, '0')}`,
+      open: 1200 + index,
+      high: 1210 + index,
+      low: 1190 + index,
+      close: 1205 + index,
+      volume: 10 + index,
+    }));
+
+    const points = sanitizeKlinePoints([
+      ...base,
+      {
+        date: '2026-04-25',
+        open: 31.2,
+        high: 31.9,
+        low: 30.8,
+        close: 31.4,
+        volume: 1,
+      },
+    ]);
+
+    expect(points).toHaveLength(base.length);
+    expect(points.at(-1)?.close).toBe(base.at(-1)?.close);
   });
 });

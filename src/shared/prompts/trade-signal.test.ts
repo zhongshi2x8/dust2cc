@@ -23,4 +23,17 @@ describe('generateQuickSignal', () => {
     expect(signal.resistance).toBeGreaterThan(signal.support ?? 0);
     expect(signal.target).toBeGreaterThan(0);
   });
+
+  it('anchors trading levels to indicator scale when current price is an obvious outlier', () => {
+    const signal = generateQuickSignal(31.31, {
+      ...invalidIndicators,
+      ma: { ma5: 1257.8, ma10: 1266.4, ma20: 1282.3, ma60: 1301.4 },
+      boll: { upper: 1326.42, mid: 1284.1, lower: 1241.7, width: 84.72 },
+    }, []);
+
+    expect(signal.buyZone ?? 0).toBeGreaterThan(1200);
+    expect(signal.stopLoss ?? 0).toBeGreaterThan(1100);
+    expect(signal.breakout ?? 0).toBeGreaterThan(1280);
+    expect(signal.target ?? 0).toBeGreaterThan(1200);
+  });
 });

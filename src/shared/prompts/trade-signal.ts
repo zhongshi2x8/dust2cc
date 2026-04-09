@@ -12,6 +12,34 @@ function clamp(value: number, min: number, max: number): number {
   return Math.min(max, Math.max(min, value));
 }
 
+function resolveSignalAnchorPrice(
+  currentPrice: number,
+  indicators: IndicatorResult,
+): number {
+  const references = [
+    indicators.boll.mid,
+    indicators.ma.ma20,
+    indicators.ma.ma10,
+    indicators.ma.ma5,
+  ].filter(isFinitePositive);
+
+  if (!isFinitePositive(currentPrice) || !references.length) {
+    return currentPrice;
+  }
+
+  const closestReference = references.reduce((best, value) => {
+    if (!isFinitePositive(best)) return value;
+    return Math.abs(value - currentPrice) < Math.abs(best - currentPrice) ? value : best;
+  }, Number.NaN);
+
+  if (!isFinitePositive(closestReference)) {
+    return currentPrice;
+  }
+
+  const deltaRatio = Math.abs(currentPrice - closestReference) / closestReference;
+  return deltaRatio >= 0.6 ? closestReference : currentPrice;
+}
+
 /**
  * Generate a quick trade signal locally (no LLM needed).
  * This runs instantly and provides a signal badge while
@@ -22,6 +50,7 @@ export function generateQuickSignal(
   indicators: IndicatorResult,
   patterns: PatternMatch[],
 ): TradeSignal {
+  const anchorPrice = resolveSignalAnchorPrice(currentPrice, indicators);
   let score = 0; // -5 to +5 scale
   const reasons: string[] = [];
   const ma20 = indicators.ma.ma20;
@@ -36,7 +65,7 @@ export function generateQuickSignal(
 
   // MA trend
   if (isFinitePositive(ma20)) {
-    if (currentPrice > ma20) {
+    if (anchorPrice > ma20) {
       score += 1;
       reasons.push('价格在MA20上方');
     } else {
@@ -68,10 +97,10 @@ export function generateQuickSignal(
   }
 
   // Bollinger position
-  if (isFinitePositive(bollLower) && currentPrice <= bollLower) {
+  if (isFinitePositive(bollLower) && anchorPrice <= bollLower) {
     score += 1;
     reasons.push('触及布林下轨');
-  } else if (isFinitePositive(bollUpper) && currentPrice >= bollUpper) {
+  } else if (isFinitePositive(bollUpper) && anchorPrice >= bollUpper) {
     score -= 1;
     reasons.push('触及布林上轨');
   }
@@ -104,30 +133,30 @@ export function generateQuickSignal(
   const confidence = Math.min(95, Math.max(10, Math.round(Math.abs(score) * 15 + 20)));
 
   // --- Compute key trading levels ---
-  const support = isFinitePositive(bollLower) ? bollLower : currentPrice * 0.94;
-  const rawResistance = isFinitePositive(bollUpper) ? bollUpper : currentPrice * 1.06;
-  const resistance = rawResistance > support ? rawResistance : currentPrice * 1.06;
-  const priceRange = Math.max(currentPrice * 0.04, resistance - support);
+  const support = isFinitePositive(bollLower) ? bollLower : anchorPrice * 0.94;
+  const rawResistance = isFinitePositive(bollUpper) ? bollUpper : anchorPrice * 1.06;
+  const resistance = rawResistance > support ? rawResistance : anchorPrice * 1.06;
+  const priceRange = Math.max(anchorPrice * 0.04, resistance - support);
 
   // Buy zone: slightly above support (support + 5% of range)
-  const buyZone = clamp(support + priceRange * 0.05, support, currentPrice * 1.01);
+  const buyZone = clamp(support + priceRange * 0.05, support, anchorPrice * 1.01);
 
   // Stop-loss: below support by ~3% of current price (practical stop)
   const stopLoss = clamp(
-    Math.min(support - currentPrice * 0.02, support * 0.985),
-    currentPrice * 0.82,
-    currentPrice * 0.995,
+    Math.min(support - anchorPrice * 0.02, support * 0.985),
+    anchorPrice * 0.82,
+    anchorPrice * 0.995,
   );
 
   // Breakout chase: slightly above resistance (resistance + 2% buffer)
-  const breakout = clamp(resistance + priceRange * 0.02, currentPrice * 1.005, currentPrice * 1.22);
+  const breakout = clamp(resistance + priceRange * 0.02, anchorPrice * 1.005, anchorPrice * 1.22);
 
   // Target price: based on signal direction
   const target =
     action === 'buy'
-      ? clamp(currentPrice + priceRange * 0.6, currentPrice * 1.02, currentPrice * 1.25)
+      ? clamp(anchorPrice + priceRange * 0.6, anchorPrice * 1.02, anchorPrice * 1.25)
       : action === 'sell'
-        ? clamp(currentPrice - priceRange * 0.4, currentPrice * 0.82, currentPrice * 0.99)
+        ? clamp(anchorPrice - priceRange * 0.4, anchorPrice * 0.82, anchorPrice * 0.99)
         : resistance;
 
   return {

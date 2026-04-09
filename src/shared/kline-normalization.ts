@@ -218,7 +218,7 @@ export function normalizePriceLikeKlineRecords(list: Array<Record<string, unknow
 }
 
 export function sanitizeKlinePoints(points: KlinePoint[]): KlinePoint[] {
-  return points
+  const normalized = points
     .filter((point) =>
       [point.open, point.high, point.low, point.close].every(
         (value) => Number.isFinite(value) && value > 0,
@@ -231,4 +231,47 @@ export function sanitizeKlinePoints(points: KlinePoint[]): KlinePoint[] {
       low: Math.min(point.low, point.open, point.close, point.high),
       volume: Number.isFinite(point.volume) ? point.volume : 0,
     }));
+
+  return trimTrailingOutlierPoints(normalized);
+}
+
+function trimTrailingOutlierPoints(points: KlinePoint[]): KlinePoint[] {
+  const trimmed = [...points];
+
+  while (trimmed.length >= 25) {
+    const tail = trimmed[trimmed.length - 1];
+    const recent = trimmed.slice(-21, -1).map((point) => point.close).filter((value) => Number.isFinite(value) && value > 0);
+    if (recent.length < 12) break;
+
+    const anchor = median(recent);
+    if (!Number.isFinite(anchor) || anchor <= 0) break;
+
+    const ratio = tail.close / anchor;
+    const openRatio = tail.open / anchor;
+    const highRatio = tail.high / anchor;
+    const lowRatio = tail.low / anchor;
+    const isExtremeTail =
+      ratio < 0.12 ||
+      ratio > 8 ||
+      openRatio < 0.12 ||
+      openRatio > 8 ||
+      highRatio < 0.12 ||
+      highRatio > 8 ||
+      lowRatio < 0.12 ||
+      lowRatio > 8;
+
+    if (!isExtremeTail) break;
+    trimmed.pop();
+  }
+
+  return trimmed;
+}
+
+function median(values: number[]): number {
+  const sorted = [...values].sort((a, b) => a - b);
+  const middle = Math.floor(sorted.length / 2);
+  if (sorted.length % 2 === 0) {
+    return (sorted[middle - 1] + sorted[middle]) / 2;
+  }
+  return sorted[middle];
 }
