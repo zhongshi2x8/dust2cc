@@ -101,6 +101,37 @@ function setPanelPlaceholder(message: string) {
   analysisStream?.classList.add('hidden');
 }
 
+function refreshInlinePanelState() {
+  const panel = document.getElementById(PANEL_ID);
+  const shadow = panel?.shadowRoot;
+  if (!shadow) return;
+
+  const panelBody = shadow.getElementById('panel-body');
+  panelBody?.classList.remove('hidden');
+
+  const debugBar = shadow.getElementById('debug-bar');
+  const debugButton = shadow.getElementById('btn-debug');
+  if (currentAdapter?.name === 'steamdt') {
+    debugBar?.classList.remove('hidden');
+    debugButton?.classList.add('active');
+  }
+
+  const analysisStatic = shadow.getElementById('analysis-static');
+  const signalArea = shadow.getElementById('signal-area');
+  const indicatorsArea = shadow.getElementById('indicators-area');
+  if (!analysisStatic || !signalArea || !indicatorsArea) return;
+
+  if (state.kline.length >= 5) return;
+
+  signalArea.classList.add('hidden');
+  indicatorsArea.classList.add('hidden');
+
+  const summary = currentAdapter?.name === 'steamdt'
+    ? `已抓到 ${state.kline.length} 根 K 线，最近状态：${debugState.lastIssue}`
+    : `已抓到 ${state.kline.length} 根 K 线，等待更多数据后自动分析。`;
+  analysisStatic.innerHTML = `<p class="placeholder">${summary}</p>`;
+}
+
 function safeExtractGoodsInfo(): GoodsInfo | null {
   try {
     return currentAdapter?.extractGoodsInfo() ?? null;
@@ -293,6 +324,7 @@ function handleCapturedData(payload: { type: string; data: unknown }) {
 
   safeSyncStateFromDom('抓取后同步页面数据');
   broadcastPageState();
+  refreshInlinePanelState();
   maybeAutoAnalyze();
 }
 
@@ -394,6 +426,7 @@ function onContentReady() {
     }
 
     bindPanelEvents(panel);
+    refreshInlinePanelState();
   }
 
   const nextAnchor = useInlinePanel
@@ -576,53 +609,53 @@ async function runAnalysis(shadow: ShadowRoot) {
     return;
   }
 
-  const indicators = computeAllIndicators(state.kline);
-  const patterns = detectAllPatterns(state.kline);
-  const currentPrice = resolveAnalysisPrice(state.price);
-  const signal = generateQuickSignal(currentPrice, indicators, patterns);
-  const settings = await getSettings();
-  const localSummary = buildLocalAnalysisMarkdown({
-    goodsInfo: state.goodsInfo,
-    price: { current: currentPrice, currency: 'CNY' },
-    kline: state.kline,
-    indicators,
-    patterns,
-    signal,
-  });
-
-  updateSignalBadge(signal);
-  showSignal(signalArea, signal);
-  showIndicators(indicatorsArea, indicators);
-  setAnalysisHTML(
-    shadow,
-    currentAdapter?.name === 'steamdt'
-      ? renderCompactInlineSummary(currentPrice, signal)
-      : renderMarkdown(localSummary),
-  );
-  annotateChart(signal, indicators);
-  setDebugState({
-    lastIssue: `分析完成，使用了 ${state.kline.length} 根 K 线`,
-  });
-
-  if (!settings.llm.apiKey || currentAdapter?.name === 'steamdt') {
-    analysisStream.classList.add('hidden');
-    return;
-  }
-
-  analysisStream.classList.remove('hidden');
-  analysisStream.innerHTML = '<p class="streaming">正在生成 AI 深度分析</p>';
-  analysisStream.classList.add('streaming');
-
-  const prompt = buildKlineAnalysisPrompt({
-    goodsInfo: state.goodsInfo || { id: '', name: '未知饰品', source: 'csqaq' },
-    price: { current: currentPrice, currency: 'CNY' },
-    kline: state.kline,
-    period: '1d',
-    indicators,
-    patterns,
-  });
-
   try {
+    const indicators = computeAllIndicators(state.kline);
+    const patterns = detectAllPatterns(state.kline);
+    const currentPrice = resolveAnalysisPrice(state.price);
+    const signal = generateQuickSignal(currentPrice, indicators, patterns);
+    const settings = await getSettings();
+    const localSummary = buildLocalAnalysisMarkdown({
+      goodsInfo: state.goodsInfo,
+      price: { current: currentPrice, currency: 'CNY' },
+      kline: state.kline,
+      indicators,
+      patterns,
+      signal,
+    });
+
+    updateSignalBadge(signal);
+    showSignal(signalArea, signal);
+    showIndicators(indicatorsArea, indicators);
+    setAnalysisHTML(
+      shadow,
+      currentAdapter?.name === 'steamdt'
+        ? renderCompactInlineSummary(currentPrice, signal)
+        : renderMarkdown(localSummary),
+    );
+    annotateChart(signal, indicators);
+    setDebugState({
+      lastIssue: `分析完成，使用了 ${state.kline.length} 根 K 线`,
+    });
+
+    if (!settings.llm.apiKey || currentAdapter?.name === 'steamdt') {
+      analysisStream.classList.add('hidden');
+      return;
+    }
+
+    analysisStream.classList.remove('hidden');
+    analysisStream.innerHTML = '<p class="streaming">正在生成 AI 深度分析</p>';
+    analysisStream.classList.add('streaming');
+
+    const prompt = buildKlineAnalysisPrompt({
+      goodsInfo: state.goodsInfo || { id: '', name: '未知饰品', source: 'csqaq' },
+      price: { current: currentPrice, currency: 'CNY' },
+      kline: state.kline,
+      period: '1d',
+      indicators,
+      patterns,
+    });
+
     const port = chrome.runtime.connect({ name: 'llm-stream' });
     let fullText = '';
     const aiSectionPrefix = `${localSummary}\n\n---\n\n## AI 深度分析\n`;
@@ -643,11 +676,14 @@ async function runAnalysis(shadow: ShadowRoot) {
     });
 
     port.postMessage({ messages: prompt });
-  } catch (e) {
-    analysisStream.innerHTML = renderMarkdown(
-      `${localSummary}\n\n---\n\n## AI 深度分析\n- 未能生成 AI 分析：${e instanceof Error ? e.message : '分析失败'}`,
-    );
-    analysisStream.classList.remove('streaming');
+  } catch (error) {
+    const message = `分析过程出错：${formatRuntimeError(error)}`;
+    console.error('[dust2cc] runAnalysis failed', error);
+    setDebugState({ lastIssue: message });
+    signalArea.classList.add('hidden');
+    indicatorsArea.classList.add('hidden');
+    analysisStatic.innerHTML = `<p class="placeholder">⚠️ ${message}</p>`;
+    analysisStream.classList.add('hidden');
   }
 }
 
