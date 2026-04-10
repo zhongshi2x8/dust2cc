@@ -1,18 +1,19 @@
 # dust2.cc 🧙
 
-对 csqaq 和 steamdt 的饰品k线以及大盘k线进行AI分析的插件工具。
-<img width="2278" height="1410" alt="image" src="https://github.com/user-attachments/assets/66f4adb5-79df-4c36-a7e7-8635a22edbc9" />
-<img width="1788" height="1242" alt="image" src="https://github.com/user-attachments/assets/9c39a25a-d953-460f-881a-5ef35d14ae49" />
-<img width="704" height="1192" alt="image" src="https://github.com/user-attachments/assets/165be58c-e626-4391-8ce4-9d155859c50a" />
+对 `csqaq` 和 `steamdt` 的饰品 K 线以及大盘 K 线进行 AI 分析的插件工具。
 
+<p align="center">
+  <img src="https://github.com/user-attachments/assets/66f4adb5-79df-4c36-a7e7-8635a22edbc9" width="31%" alt="dust2.cc 演示图 1" />
+  <img src="https://github.com/user-attachments/assets/9c39a25a-d953-460f-881a-5ef35d14ae49" width="31%" alt="dust2.cc 演示图 2" />
+  <img src="https://github.com/user-attachments/assets/165be58c-e626-4391-8ce4-9d155859c50a" width="18%" alt="dust2.cc 演示图 3" />
+</p>
 
 ## ✨ 功能特性
 
 - 📈 自动抓取站点 K 线与价格数据
-- 🤖 提供页内 AI 分析面板和 Chrome side panel，可自定义AI大模型api
+- 🤖 提供页内 AI 分析面板和 Chrome side panel，可自定义 AI 大模型 API
 - 🎯 生成买入区、止损位、目标价、支撑阻力等关键价位
 - 🧩 支持图表重点位标注与指标摘要
-
 
 ## 🌐 当前支持站点
 
@@ -33,7 +34,6 @@
 4. 打开右上角“开发者模式”
 5. 点击“加载已解压的扩展程序”
 6. 选择刚刚解压出来的 `dist` 文件夹
-
 
 ## 🛠 技术栈
 
@@ -86,6 +86,7 @@ npm run package
 ```bash
 release/dist.zip
 ```
+
 ## 📄 License
 
 MIT
