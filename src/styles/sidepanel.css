@@ -190,6 +190,76 @@ body.extension-popup .app {
   font-size: 13px;
 }
 
+.period-toolbar {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+  padding: 10px 12px;
+  border-radius: 10px;
+  background: rgba(20, 24, 50, 0.55);
+  border: 1px solid #333a60;
+}
+
+.period-tabs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.period-tabs button {
+  padding: 6px 10px;
+  border-radius: 999px;
+  border: 1px solid #38406d;
+  background: transparent;
+  color: #b7bfde;
+  cursor: pointer;
+  font-size: 12px;
+}
+
+.period-tabs button.active {
+  border-color: #7f8cff;
+  background: rgba(127, 140, 255, 0.18);
+  color: #eef2ff;
+}
+
+.period-mode-note {
+  color: #9aa3d6;
+  font-size: 12px;
+}
+
+.copy-actions {
+  display: flex;
+  gap: 10px;
+}
+
+.copy-actions button {
+  flex: 1;
+  padding: 9px 12px;
+  border-radius: 8px;
+  border: 1px solid #4e5db9;
+  background: rgba(92, 107, 192, 0.12);
+  color: #dfe4ff;
+  cursor: pointer;
+  font-size: 12px;
+}
+
+.copy-actions button:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.secondary-btn {
+  width: 100%;
+  padding: 10px 12px;
+  border-radius: 8px;
+  border: 1px solid #4e5db9;
+  background: rgba(92, 107, 192, 0.12);
+  color: #dfe4ff;
+  cursor: pointer;
+  font-size: 13px;
+}
+
 .analysis-content {
   padding: 12px;
   background: #242442;
@@ -319,6 +389,54 @@ body.extension-popup .app {
   gap: 16px;
 }
 
+.history-view {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.history-layout {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 12px;
+}
+
+.history-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.history-card {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 12px;
+  border-radius: 10px;
+  border: 1px solid #333a60;
+  background: #202445;
+  color: #dfe4ff;
+  text-align: left;
+  cursor: pointer;
+}
+
+.history-card.active {
+  border-color: #7f8cff;
+  background: #283063;
+}
+
+.history-card span {
+  color: #b7bfde;
+  font-size: 12px;
+  line-height: 1.5;
+}
+
+.history-detail {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
 .app.popup-mode .settings-view {
   gap: 12px;
 }
@@ -375,6 +493,13 @@ body.extension-popup .app {
   border-color: #7f8cff;
   background: #283063;
   box-shadow: 0 0 0 1px rgba(127, 140, 255, 0.18);
+}
+
+.comparison-form {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  margin-top: 12px;
 }
 
 .provider-card p {
@@ -469,6 +594,12 @@ body.extension-popup .app {
   font-size: 12px;
 }
 
+.field-help {
+  color: #9aa3d6;
+  font-size: 12px;
+  line-height: 1.5;
+}
+
 .form-group select,
 .form-group input[type="text"],
 .form-group input[type="password"],
@@ -497,6 +628,18 @@ body.extension-popup .app {
 
 .form-group input[type="checkbox"] {
   accent-color: #5C6BC0;
+}
+
+.checkbox-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 12px;
+  border-radius: 10px;
+  background: rgba(20, 24, 50, 0.55);
+  border: 1px solid #333a60;
+  color: #cfd5f6;
+  font-size: 13px;
 }
 
 .form-actions {

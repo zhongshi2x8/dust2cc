@@ -1,6 +1,7 @@
 import React, { useEffect, useMemo, useState } from 'react';
+import { validateLLMConfig } from '@shared/llm-config';
 import { PROVIDERS, getProviderOption } from '@shared/provider-options';
-import type { LLMConfig, UserSettings } from '@shared/types';
+import type { KlinePeriod, LLMConfig, UserSettings } from '@shared/types';
 
 interface RuntimeResponse<T> {
   ok: boolean;
@@ -17,6 +18,18 @@ function buildInitialDraft(settings: UserSettings | null): LLMConfig {
     provider: 'deepseek',
     apiKey: '',
     model: 'deepseek-chat',
+    allowNoApiKey: false,
+    maxTokens: 2000,
+    temperature: 0.3,
+  };
+}
+
+function buildInitialCompareDraft(settings: UserSettings | null): LLMConfig {
+  return settings?.comparison.llm ?? {
+    provider: 'deepseek',
+    apiKey: '',
+    model: 'deepseek-chat',
+    allowNoApiKey: false,
     maxTokens: 2000,
     temperature: 0.3,
   };
@@ -25,12 +38,15 @@ function buildInitialDraft(settings: UserSettings | null): LLMConfig {
 export function SettingsView() {
   const [settings, setSettings] = useState<UserSettings | null>(null);
   const [draft, setDraft] = useState<LLMConfig>(buildInitialDraft(null));
+  const [compareDraft, setCompareDraft] = useState<LLMConfig>(buildInitialCompareDraft(null));
   const [providerPickerOpen, setProviderPickerOpen] = useState(false);
+  const [comparePickerOpen, setComparePickerOpen] = useState(false);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [testing, setTesting] = useState(false);
   const [notice, setNotice] = useState('');
-  const [testResult, setTestResult] = useState('');
+const [testResult, setTestResult] = useState('');
+  const periodOptions: KlinePeriod[] = ['1h', '4h', '1d', '1w'];
 
   useEffect(() => {
     let cancelled = false;
@@ -43,7 +59,9 @@ export function SettingsView() {
       if (response.ok && response.data) {
         setSettings(response.data);
         setDraft(buildInitialDraft(response.data));
+        setCompareDraft(buildInitialCompareDraft(response.data));
         setProviderPickerOpen(response.data.llm.provider === 'openai_compatible_custom');
+        setComparePickerOpen(response.data.comparison.enabled);
         setNotice('');
       } else {
         setNotice(response.error || '读取设置失败');
@@ -62,9 +80,21 @@ export function SettingsView() {
     () => getProviderOption(draft.provider),
     [draft.provider],
   );
+  const selectedCompareProvider = useMemo(
+    () => getProviderOption(compareDraft.provider),
+    [compareDraft.provider],
+  );
+  const customProviderSelected = draft.provider === 'openai_compatible_custom';
+  const customCompareProviderSelected = compareDraft.provider === 'openai_compatible_custom';
 
   function updateDraft(next: Partial<LLMConfig>) {
     setDraft((current) => ({ ...current, ...next }));
+    setNotice('');
+    setTestResult('');
+  }
+
+  function updateCompareDraft(next: Partial<LLMConfig>) {
+    setCompareDraft((current) => ({ ...current, ...next }));
     setNotice('');
     setTestResult('');
   }
@@ -82,12 +112,61 @@ export function SettingsView() {
     updateDraft({
       provider,
       model: nextModel,
+      allowNoApiKey: provider === 'openai_compatible_custom' ? draft.allowNoApiKey : false,
       ...(provider === 'ollama' && !draft.baseUrl ? { baseUrl: 'http://localhost:11434/v1' } : {}),
     });
     setProviderPickerOpen(provider === 'openai_compatible_custom');
   }
 
+  function handleCompareProviderChange(provider: LLMConfig['provider']) {
+    const providerOption = getProviderOption(provider);
+    const previousOption = getProviderOption(compareDraft.provider);
+    const nextModel =
+      !compareDraft.model
+      || compareDraft.model === previousOption?.models[0]
+      || (previousOption?.models.length ? previousOption.models.includes(compareDraft.model) : false)
+        ? (providerOption?.models[0] ?? compareDraft.model)
+        : compareDraft.model;
+
+    updateCompareDraft({
+      provider,
+      model: nextModel,
+      allowNoApiKey: provider === 'openai_compatible_custom' ? compareDraft.allowNoApiKey : false,
+      ...(provider === 'ollama' && !compareDraft.baseUrl ? { baseUrl: 'http://localhost:11434/v1' } : {}),
+    });
+  }
+
+  function validateDraftBeforeSubmit(): string | null {
+    return validateLLMConfig({
+      ...draft,
+      apiKey: draft.apiKey.trim(),
+      baseUrl: draft.baseUrl?.trim() || undefined,
+      model: draft.model.trim(),
+    });
+  }
+
+  function validateCompareDraftBeforeSubmit(): string | null {
+    if (!settings?.comparison.enabled) return null;
+    return validateLLMConfig({
+      ...compareDraft,
+      apiKey: compareDraft.apiKey.trim(),
+      baseUrl: compareDraft.baseUrl?.trim() || undefined,
+      model: compareDraft.model.trim(),
+    });
+  }
+
   async function handleSave() {
+    const validationError = validateDraftBeforeSubmit();
+    if (validationError) {
+      setNotice(validationError);
+      return;
+    }
+    const compareValidationError = validateCompareDraftBeforeSubmit();
+    if (compareValidationError) {
+      setNotice(`对比模型配置有误：${compareValidationError}`);
+      return;
+    }
+
     setSaving(true);
     setNotice('');
 
@@ -95,6 +174,11 @@ export function SettingsView() {
       type: 'SAVE_SETTINGS',
       data: {
         llm: draft,
+        comparison: settings?.comparison ? {
+          enabled: settings.comparison.enabled,
+          llm: compareDraft,
+        } : undefined,
+        analysis: settings?.analysis,
       },
     });
 
@@ -105,11 +189,25 @@ export function SettingsView() {
       return;
     }
 
-    setSettings((current) => (current ? { ...current, llm: draft } : current));
+    setSettings((current) => (current ? {
+      ...current,
+      llm: draft,
+      comparison: settings?.comparison ? {
+        ...settings.comparison,
+        llm: compareDraft,
+      } : current.comparison,
+      analysis: settings?.analysis ?? current.analysis,
+    } : current));
     setNotice('设置已保存');
   }
 
   async function handleTestConnection() {
+    const validationError = validateDraftBeforeSubmit();
+    if (validationError) {
+      setTestResult(validationError);
+      return;
+    }
+
     setTesting(true);
     setTestResult('');
 
@@ -137,6 +235,76 @@ export function SettingsView() {
       <div className="setup-card">
         <h2>模型设置</h2>
         <p>支持预设模型，也支持任何兼容 OpenAI `/chat/completions` 的自定义接口。</p>
+      </div>
+
+      <div className="provider-details">
+        <div className="form-group">
+          <label htmlFor="period-mode-select">分析周期模式</label>
+          <select
+            id="period-mode-select"
+            value={settings?.analysis.periodMode ?? 'single'}
+            onChange={(event) => {
+              const periodMode = event.target.value as UserSettings['analysis']['periodMode'];
+              setSettings((current) => current ? {
+                ...current,
+                analysis: {
+                  ...current.analysis,
+                  periodMode,
+                },
+              } : current);
+            }}
+          >
+            <option value="single">single</option>
+            <option value="multi">multi</option>
+          </select>
+        </div>
+
+        <div className="form-group">
+          <label htmlFor="default-period-select">默认分析周期</label>
+          <select
+            id="default-period-select"
+            value={settings?.analysis.defaultPeriod ?? '1d'}
+            onChange={(event) => {
+              const defaultPeriod = event.target.value as KlinePeriod;
+              setSettings((current) => current ? {
+                ...current,
+                analysis: {
+                  ...current.analysis,
+                  defaultPeriod,
+                },
+              } : current);
+            }}
+          >
+            {periodOptions.map((period) => (
+              <option key={period} value={period}>
+                {period}
+              </option>
+            ))}
+          </select>
+        </div>
+
+        <div className="form-group">
+          <label htmlFor="analysis-style-select">分析风格</label>
+          <select
+            id="analysis-style-select"
+            value={settings?.analysis.aiStyle ?? 'balanced'}
+            onChange={(event) => {
+              const aiStyle = event.target.value as UserSettings['analysis']['aiStyle'];
+              setSettings((current) => current ? {
+                ...current,
+                analysis: {
+                  ...current.analysis,
+                  aiStyle,
+                },
+              } : current);
+            }}
+          >
+            <option value="balanced">balanced</option>
+            <option value="conservative">conservative</option>
+            <option value="aggressive">aggressive</option>
+            <option value="objective">objective</option>
+          </select>
+        </div>
       </div>
 
       {selectedProvider && (
@@ -172,6 +340,93 @@ export function SettingsView() {
         </div>
       </details>
 
+      <details
+        className="provider-details"
+        open={comparePickerOpen}
+        onToggle={(event) => setComparePickerOpen((event.currentTarget as HTMLDetailsElement).open)}
+      >
+        <summary>对比模型配置</summary>
+        <label className="checkbox-row">
+          <input
+            type="checkbox"
+            checked={settings?.comparison.enabled === true}
+            onChange={(event) => {
+              setSettings((current) => current ? {
+                ...current,
+                comparison: {
+                  ...current.comparison,
+                  enabled: event.target.checked,
+                },
+              } : current);
+            }}
+          />
+          <span>启用对比模型分析</span>
+        </label>
+
+        {settings?.comparison.enabled && (
+          <div className="comparison-form">
+            <div className="form-group">
+              <label htmlFor="compare-provider-select">对比 Provider</label>
+              <select
+                id="compare-provider-select"
+                value={compareDraft.provider}
+                onChange={(event) => handleCompareProviderChange(event.target.value as LLMConfig['provider'])}
+              >
+                {PROVIDERS.map((provider) => (
+                  <option key={provider.id} value={provider.id}>
+                    {provider.name}
+                  </option>
+                ))}
+              </select>
+            </div>
+
+            <div className="form-group">
+              <label htmlFor="compare-model-input">对比 Model</label>
+              <input
+                id="compare-model-input"
+                type="text"
+                value={compareDraft.model}
+                onChange={(event) => updateCompareDraft({ model: event.target.value })}
+                placeholder={selectedCompareProvider?.models[0] ?? '例如：gpt-4o-mini'}
+              />
+            </div>
+
+            <div className="form-group">
+              <label htmlFor="compare-api-key-input">对比 API Key</label>
+              <input
+                id="compare-api-key-input"
+                type="password"
+                value={compareDraft.apiKey}
+                onChange={(event) => updateCompareDraft({ apiKey: event.target.value })}
+                placeholder={selectedCompareProvider?.placeholder ?? 'sk-...'}
+              />
+            </div>
+
+            {customCompareProviderSelected && (
+              <label className="checkbox-row">
+                <input
+                  type="checkbox"
+                  checked={compareDraft.allowNoApiKey === true}
+                  onChange={(event) => updateCompareDraft({ allowNoApiKey: event.target.checked })}
+                />
+                <span>这个对比接口不需要 API Key</span>
+              </label>
+            )}
+
+            <div className="form-group">
+              <label htmlFor="compare-base-url-input">对比 Base URL</label>
+              <input
+                id="compare-base-url-input"
+                type="text"
+                value={compareDraft.baseUrl ?? ''}
+                onChange={(event) => updateCompareDraft({ baseUrl: event.target.value })}
+                placeholder={customCompareProviderSelected ? '例如：https://your-proxy.example.com/v1' : '通常不需要填写'}
+              />
+            </div>
+          </div>
+        )}
+      </details>
+
       <div className="form-group">
         <label htmlFor="provider-select">Provider</label>
         <select
@@ -188,7 +443,7 @@ export function SettingsView() {
       </div>
 
       <div className="form-group">
-        <label htmlFor="model-input">Model</label>
+        <label htmlFor="model-input">Model{customProviderSelected ? '（必填）' : ''}</label>
         <input
           id="model-input"
           list="provider-models"
@@ -197,6 +452,9 @@ export function SettingsView() {
           onChange={(event) => updateDraft({ model: event.target.value })}
           placeholder={selectedProvider?.models[0] ?? '例如：gpt-4o-mini'}
         />
+        {customProviderSelected && (
+          <span className="field-help">自定义接口下这是必填项，请填写网关实际支持的模型名。</span>
+        )}
         <datalist id="provider-models">
           {(selectedProvider?.models || []).map((model) => (
             <option key={model} value={model} />
@@ -206,7 +464,7 @@ export function SettingsView() {
 
       <div className="form-group">
         <label htmlFor="api-key-input">
-          API Key
+          API Key{customProviderSelected && !draft.allowNoApiKey ? '（必填）' : ''}
           {selectedProvider?.helpUrl && (
             <a href={selectedProvider.helpUrl} target="_blank" rel="noreferrer">
               获取 Key
@@ -222,8 +480,19 @@ export function SettingsView() {
         />
       </div>
 
+      {customProviderSelected && (
+        <label className="checkbox-row">
+          <input
+            type="checkbox"
+            checked={draft.allowNoApiKey === true}
+            onChange={(event) => updateDraft({ allowNoApiKey: event.target.checked })}
+          />
+          <span>这个自定义接口不需要 API Key</span>
+        </label>
+      )}
+
       <div className="form-group">
-        <label htmlFor="base-url-input">Base URL</label>
+        <label htmlFor="base-url-input">Base URL{customProviderSelected ? '（必填）' : ''}</label>
         <input
           id="base-url-input"
           type="text"
@@ -235,6 +504,11 @@ export function SettingsView() {
               : '预设供应商通常不需要填写，可留空'
           }
         />
+        <span className="field-help">
+          {customProviderSelected
+            ? '必须填写你的 OpenAI-compatible 网关地址，程序会自动拼接 /chat/completions。'
+            : '预设供应商通常不需要填写，只有走代理或自定义网关时才需要。'}
+        </span>
       </div>
 
       <div className="form-group">

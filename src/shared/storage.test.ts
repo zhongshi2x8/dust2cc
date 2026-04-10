@@ -32,9 +32,32 @@ describe('normalizeSettings', () => {
       },
     });
 
-    expect(settings.llm.model).toBe('deepseek-chat');
+    expect(settings.llm.model).toBe('');
     expect(settings.llm.maxTokens).toBe(1);
     expect(settings.llm.temperature).toBe(2);
+  });
+
+  it('defaults allowNoApiKey to false and preserves explicit true', () => {
+    const withoutFlag = normalizeSettings({
+      llm: {
+        provider: 'openai_compatible_custom',
+        apiKey: '',
+        baseUrl: 'https://example.com/v1',
+        model: 'custom-model',
+      },
+    });
+    const withFlag = normalizeSettings({
+      llm: {
+        provider: 'openai_compatible_custom',
+        apiKey: '',
+        baseUrl: 'https://example.com/v1',
+        model: 'custom-model',
+        allowNoApiKey: true,
+      },
+    });
+
+    expect(withoutFlag.llm.allowNoApiKey).toBe(false);
+    expect(withFlag.llm.allowNoApiKey).toBe(true);
   });
 });
 
@@ -55,5 +78,26 @@ describe('mergeSettings', () => {
     expect(merged.llm.model).toBe('deepseek-chat');
     expect(merged.llm.maxTokens).toBe(2000);
     expect(merged.analysis.defaultPeriod).toBe('1d');
+  });
+
+  it('deep merges comparison llm config without losing defaults', () => {
+    const merged = mergeSettings(
+      normalizeSettings(undefined),
+      {
+        comparison: {
+          enabled: true,
+          llm: {
+            provider: 'openai_compatible_custom',
+            model: 'gpt-4o-mini',
+            baseUrl: 'https://compare.example.com/v1',
+          },
+        },
+      },
+    );
+
+    expect(merged.comparison.enabled).toBe(true);
+    expect(merged.comparison.llm.provider).toBe('openai_compatible_custom');
+    expect(merged.comparison.llm.baseUrl).toBe('https://compare.example.com/v1');
+    expect(merged.comparison.llm.maxTokens).toBe(2000);
   });
 });

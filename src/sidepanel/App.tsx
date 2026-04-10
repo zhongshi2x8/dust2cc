@@ -1,10 +1,11 @@
 import React, { useState } from 'react';
 import { AnalysisView } from './views/AnalysisView';
+import { HistoryView } from './views/HistoryView';
 import { SettingsView } from './views/SettingsView';
 import { EXTENSION_NAME } from '@shared/constants';
 
 export function App() {
-  const [activeView, setActiveView] = useState<'analysis' | 'settings'>('analysis');
+  const [activeView, setActiveView] = useState<'analysis' | 'history' | 'settings'>('analysis');
 
   return (
     <div className="app">
@@ -23,6 +24,12 @@ export function App() {
           分析
         </button>
         <button
+          className={activeView === 'history' ? 'active' : ''}
+          onClick={() => setActiveView('history')}
+        >
+          历史
+        </button>
+        <button
           className={activeView === 'settings' ? 'active' : ''}
           onClick={() => setActiveView('settings')}
         >
@@ -31,7 +38,11 @@ export function App() {
       </nav>
 
       <main className="app-main">
-        {activeView === 'analysis' ? <AnalysisView /> : <SettingsView />}
+        {activeView === 'analysis'
+          ? <AnalysisView />
+          : activeView === 'history'
+            ? <HistoryView />
+            : <SettingsView />}
       </main>
     </div>
   );

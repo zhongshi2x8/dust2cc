@@ -100,7 +100,7 @@ export const PROVIDERS: ProviderOption[] = [
     summary: '适配 one-api、New API、中转站、自建网关或任何兼容 /chat/completions 的接口。',
     setupLevel: 'advanced',
     models: ['gpt-4o-mini', 'deepseek-chat', 'qwen-plus'],
-    placeholder: '可留空或填写你的 API Key',
+    placeholder: 'sk-...（无鉴权网关可勾选下方开关）',
     helpUrl: 'https://platform.openai.com/docs/api-reference/chat/create',
   },
 ];

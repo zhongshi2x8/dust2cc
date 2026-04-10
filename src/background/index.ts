@@ -32,24 +32,9 @@ async function handleMessage(
         sendResponse({ ok: true });
         break;
       }
-      case 'TEST_CONNECTION': {
-        const settings = await getSettings();
-        const result = await testConnection(msg.data as Partial<LLMConfig> | undefined);
-        if (!result.ok && result.error) {
-          const provider = ((msg.data as Partial<LLMConfig> | undefined)?.provider || settings.llm.provider);
-          result.error = humanizeProviderError(provider, result.error);
-        }
-        sendResponse({ ok: true, data: result });
-        break;
-      }
+      case 'TEST_CONNECTION':
       case 'TEST_LLM_CONNECTION': {
-        const settings = await getSettings();
-        const result = await testConnection(msg.data as Partial<LLMConfig> | undefined);
-        if (!result.ok && result.error) {
-          const provider = ((msg.data as Partial<LLMConfig> | undefined)?.provider || settings.llm.provider);
-          result.error = humanizeProviderError(provider, result.error);
-        }
-        sendResponse({ ok: true, data: result });
+        await handleTestConnectionMessage(msg.data as Partial<LLMConfig> | undefined, sendResponse);
         break;
       }
       default:
@@ -60,23 +45,37 @@ async function handleMessage(
   }
 }
 
+async function handleTestConnectionMessage(
+  configOverride: Partial<LLMConfig> | undefined,
+  sendResponse: (response: unknown) => void,
+) {
+  const settings = await getSettings();
+  const result = await testConnection(configOverride);
+  if (!result.ok && result.error) {
+    const provider = configOverride?.provider || settings.llm.provider;
+    result.error = humanizeProviderError(provider, result.error);
+  }
+  sendResponse({ ok: true, data: result });
+}
+
 // ----- Streaming LLM via Port -----
 
 chrome.runtime.onConnect.addListener((port) => {
   if (port.name !== 'llm-stream') return;
 
-  port.onMessage.addListener(async (msg: { messages: LLMMessage[] }) => {
+  port.onMessage.addListener(async (msg: { messages: LLMMessage[]; configOverride?: Partial<LLMConfig> }) => {
     try {
-      for await (const chunk of streamChat(msg.messages)) {
+      for await (const chunk of streamChat(msg.messages, msg.configOverride)) {
         port.postMessage({ type: 'chunk', text: chunk });
       }
       port.postMessage({ type: 'done' });
     } catch (e) {
       const settings = await getSettings();
+      const provider = msg.configOverride?.provider || settings.llm.provider;
       port.postMessage({
         type: 'error',
         error: humanizeProviderError(
-          settings.llm.provider,
+          provider,
           e instanceof Error ? e.message : String(e),
         ),
       });
