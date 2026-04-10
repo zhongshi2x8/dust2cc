@@ -87,10 +87,6 @@ npm run package
 ```bash
 release/dist.zip
 ```
-
-
-
-
 ## 📄 License
 
 MIT

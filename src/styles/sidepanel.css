@@ -49,10 +49,6 @@ body.extension-popup .app {
   font-size: 12px;
 }
 
-.app.popup-mode .app-nav {
-  display: none;
-}
-
 .app.popup-mode .app-main {
   padding: 12px;
 }
@@ -194,6 +190,121 @@ body.extension-popup .app {
   font-size: 13px;
 }
 
+.period-toolbar {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+  padding: 10px 12px;
+  border-radius: 10px;
+  background: rgba(20, 24, 50, 0.55);
+  border: 1px solid #333a60;
+}
+
+.period-tabs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.period-tabs button {
+  padding: 6px 10px;
+  border-radius: 999px;
+  border: 1px solid #38406d;
+  background: transparent;
+  color: #b7bfde;
+  cursor: pointer;
+  font-size: 12px;
+}
+
+.period-tabs button.active {
+  border-color: #7f8cff;
+  background: rgba(127, 140, 255, 0.18);
+  color: #eef2ff;
+}
+
+.period-mode-note {
+  color: #9aa3d6;
+  font-size: 12px;
+}
+
+.analysis-meta-panel {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.analysis-meta-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.meta-chip {
+  display: inline-flex;
+  align-items: center;
+  padding: 6px 10px;
+  border-radius: 999px;
+  background: rgba(127, 140, 255, 0.14);
+  border: 1px solid rgba(127, 140, 255, 0.22);
+  color: #dfe4ff;
+  font-size: 12px;
+}
+
+.copy-actions {
+  display: flex;
+  gap: 10px;
+}
+
+.copy-actions button {
+  flex: 1;
+  padding: 9px 12px;
+  border-radius: 8px;
+  border: 1px solid #4e5db9;
+  background: rgba(92, 107, 192, 0.12);
+  color: #dfe4ff;
+  cursor: pointer;
+  font-size: 12px;
+}
+
+.copy-actions button:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.secondary-btn {
+  width: 100%;
+  padding: 10px 12px;
+  border-radius: 8px;
+  border: 1px solid #4e5db9;
+  background: rgba(92, 107, 192, 0.12);
+  color: #dfe4ff;
+  cursor: pointer;
+  font-size: 13px;
+}
+
+.compare-actions {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.subtle-note {
+  color: #9aa3d6;
+  font-size: 12px;
+  line-height: 1.5;
+}
+
+.model-analysis-section {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.compare-section {
+  margin-top: 4px;
+}
+
 .analysis-content {
   padding: 12px;
   background: #242442;
@@ -323,6 +434,77 @@ body.extension-popup .app {
   gap: 16px;
 }
 
+.history-view {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.history-layout {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 12px;
+}
+
+.history-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.history-card {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 12px;
+  border-radius: 10px;
+  border: 1px solid #333a60;
+  background: #202445;
+  color: #dfe4ff;
+  text-align: left;
+  cursor: pointer;
+}
+
+.history-card.active {
+  border-color: #7f8cff;
+  background: #283063;
+}
+
+.history-card span {
+  color: #b7bfde;
+  font-size: 12px;
+  line-height: 1.5;
+}
+
+.history-detail {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.confirm-inline {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 12px;
+  border-radius: 10px;
+  border: 1px solid rgba(235, 75, 75, 0.35);
+  background: rgba(58, 26, 26, 0.55);
+  color: #ffd6d6;
+  font-size: 13px;
+}
+
+.confirm-inline-actions {
+  display: flex;
+  gap: 10px;
+}
+
+.ghost-btn {
+  background: transparent;
+  border: 1px solid #5e688f;
+  color: #cfd5f6;
+}
+
 .app.popup-mode .settings-view {
   gap: 12px;
 }
@@ -379,6 +561,13 @@ body.extension-popup .app {
   border-color: #7f8cff;
   background: #283063;
   box-shadow: 0 0 0 1px rgba(127, 140, 255, 0.18);
+}
+
+.comparison-form {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  margin-top: 12px;
 }
 
 .provider-card p {
@@ -473,9 +662,16 @@ body.extension-popup .app {
   font-size: 12px;
 }
 
+.field-help {
+  color: #9aa3d6;
+  font-size: 12px;
+  line-height: 1.5;
+}
+
 .form-group select,
 .form-group input[type="text"],
-.form-group input[type="password"] {
+.form-group input[type="password"],
+.form-group input[type="number"] {
   padding: 10px 12px;
   border: 1px solid #444;
   border-radius: 8px;
@@ -487,7 +683,8 @@ body.extension-popup .app {
 
 .app.popup-mode .form-group select,
 .app.popup-mode .form-group input[type="text"],
-.app.popup-mode .form-group input[type="password"] {
+.app.popup-mode .form-group input[type="password"],
+.app.popup-mode .form-group input[type="number"] {
   padding: 9px 10px;
   font-size: 12px;
 }
@@ -499,6 +696,18 @@ body.extension-popup .app {
 
 .form-group input[type="checkbox"] {
   accent-color: #5C6BC0;
+}
+
+.checkbox-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 12px;
+  border-radius: 10px;
+  background: rgba(20, 24, 50, 0.55);
+  border: 1px solid #333a60;
+  color: #cfd5f6;
+  font-size: 13px;
 }
 
 .form-actions {
@@ -530,4 +739,74 @@ body.extension-popup .app {
 
 .test-result {
   font-size: 13px;
+}
+
+.test-result.success-text {
+  color: #8ce99a;
+}
+
+.test-result.error-text {
+  color: #ff9f9f;
+}
+
+.structured-ai-card {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 12px;
+  border-radius: 12px;
+  border: 1px solid #333a60;
+  background: #202445;
+}
+
+.structured-ai-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.structured-ai-block {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 10px;
+  border-radius: 10px;
+  background: rgba(12, 16, 36, 0.55);
+  border: 1px solid rgba(127, 140, 255, 0.14);
+}
+
+.structured-ai-label {
+  font-size: 12px;
+  color: #9aa3d6;
+}
+
+.structured-ai-risks {
+  margin-left: 18px;
+  color: #dfe4ff;
+}
+
+.timeframe-bias-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.timeframe-bias-item {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 8px 10px;
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid rgba(255, 255, 255, 0.06);
+}
+
+.timeframe-bias-item.primary {
+  border-color: rgba(127, 140, 255, 0.4);
+  background: rgba(127, 140, 255, 0.14);
+}
+
+.timeframe-bias-period {
+  color: #9aa3d6;
+  font-size: 12px;
 }

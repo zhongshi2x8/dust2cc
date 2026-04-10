@@ -1,12 +1,14 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { AnalysisView } from './views/AnalysisView';
+import { HistoryView } from './views/HistoryView';
+import { SettingsView } from './views/SettingsView';
 import { EXTENSION_NAME } from '@shared/constants';
 
 export function App() {
-  const popupMode = window.innerWidth <= 420;
+  const [activeView, setActiveView] = useState<'analysis' | 'history' | 'settings'>('analysis');
 
   return (
-    <div className={`app ${popupMode ? 'popup-mode' : ''}`}>
+    <div className="app">
       <header className="app-header">
         <h1>🧙 {EXTENSION_NAME}</h1>
         <p className="app-subtitle">
@@ -14,8 +16,33 @@ export function App() {
         </p>
       </header>
 
+      <nav className="app-nav">
+        <button
+          className={activeView === 'analysis' ? 'active' : ''}
+          onClick={() => setActiveView('analysis')}
+        >
+          分析
+        </button>
+        <button
+          className={activeView === 'history' ? 'active' : ''}
+          onClick={() => setActiveView('history')}
+        >
+          历史
+        </button>
+        <button
+          className={activeView === 'settings' ? 'active' : ''}
+          onClick={() => setActiveView('settings')}
+        >
+          设置
+        </button>
+      </nav>
+
       <main className="app-main">
-        <AnalysisView />
+        {activeView === 'analysis'
+          ? <AnalysisView />
+          : activeView === 'history'
+            ? <HistoryView />
+            : <SettingsView />}
       </main>
     </div>
   );

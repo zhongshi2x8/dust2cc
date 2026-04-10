@@ -15,6 +15,8 @@ export interface KlinePoint {
 }
 
 export type KlinePeriod = '1h' | '4h' | '1d' | '1w' | '1M';
+export type AnalysisPeriodMode = 'single' | 'multi';
+export type AnalysisStyle = 'balanced' | 'conservative' | 'aggressive' | 'objective';
 
 // ----- Goods / Item Info -----
 
@@ -98,6 +100,18 @@ export interface AnalysisInput {
   price: PriceInfo;
   kline: KlinePoint[];
   period: KlinePeriod;
+  primaryPeriod?: KlinePeriod;
+  periodMode?: AnalysisPeriodMode;
+  style?: AnalysisStyle;
+  timeframes?: TimeframeAnalysisInput[];
+  indicators: IndicatorResult;
+  patterns: PatternMatch[];
+}
+
+export interface TimeframeAnalysisInput {
+  period: KlinePeriod;
+  price: PriceInfo;
+  kline: KlinePoint[];
   indicators: IndicatorResult;
   patterns: PatternMatch[];
 }
@@ -118,10 +132,25 @@ export interface TradeSignal {
   target?: number;
 }
 
+export interface StructuredAIAnalysis {
+  summary: string;
+  trend: string;
+  confidence: number;
+  reasoning: string[];
+  signals: string[];
+  supportLevels: number[];
+  resistanceLevels: number[];
+  suggestion: string;
+  risks: string[];
+  timeframeBias?: Record<string, string>;
+  primaryTimeframe?: string;
+}
+
 export interface PageSnapshot {
   goodsInfo: GoodsInfo | null;
   price: PriceInfo | null;
   kline: KlinePoint[];
+  timeframeData?: Partial<Record<KlinePeriod, KlinePoint[]>>;
 }
 
 // ----- LLM Configuration -----
@@ -135,13 +164,15 @@ export type LLMProviderType =
   | 'kimi_code'
   | 'glm'
   | 'gemini'
-  | 'ollama';
+  | 'ollama'
+  | 'openai_compatible_custom';
 
 export interface LLMConfig {
   provider: LLMProviderType;
   apiKey: string;
   model: string;
   baseUrl?: string;
+  allowNoApiKey?: boolean;
   maxTokens: number;
   temperature: number;
 }
@@ -166,7 +197,8 @@ export type MessageType =
   | 'LLM_STREAM_ERROR'
   | 'GET_SETTINGS'
   | 'SAVE_SETTINGS'
-  | 'TEST_CONNECTION';
+  | 'TEST_CONNECTION'
+  | 'TEST_LLM_CONNECTION';
 
 export interface ExtensionMessage {
   type: MessageType;
@@ -177,9 +209,15 @@ export interface ExtensionMessage {
 
 export interface UserSettings {
   llm: LLMConfig;
+  comparison: {
+    enabled: boolean;
+    llm: LLMConfig;
+  };
   analysis: {
     autoAnalyze: boolean;
+    periodMode: AnalysisPeriodMode;
     defaultPeriod: KlinePeriod;
+    aiStyle: AnalysisStyle;
     enabledIndicators: string[];
   };
   ui: {
@@ -229,4 +267,21 @@ export interface CachedAnalysis {
   indicators: IndicatorResult;
   patterns: PatternMatch[];
   createdAt: number;
+}
+
+export interface AnalysisHistoryEntry {
+  id: string;
+  createdAt: number;
+  goodsId: string;
+  goodsName: string;
+  price: number;
+  period: KlinePeriod;
+  periodMode: AnalysisPeriodMode;
+  analysisStyle: AnalysisStyle;
+  primaryTimeframe?: KlinePeriod;
+  usedTimeframes?: KlinePeriod[];
+  localSignal: Pick<TradeSignal, 'action' | 'confidence' | 'reason'>;
+  localAnalysis: string;
+  structuredAI?: StructuredAIAnalysis;
+  fallbackText?: string;
 }

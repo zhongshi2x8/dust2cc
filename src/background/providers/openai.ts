@@ -19,15 +19,22 @@ export class OpenAICompatibleProvider extends BaseLLMProvider {
   }
 
   async *chatStream(messages: LLMMessage[], options: StreamOptions): AsyncGenerator<string> {
-    const baseUrl = options.baseUrl || this.defaultBaseUrl;
+    const baseUrl = options.baseUrl?.trim() || this.defaultBaseUrl.trim();
+    if (!baseUrl) {
+      throw new Error('请先填写 Base URL');
+    }
     const url = `${baseUrl.replace(/\/+$/, '')}/chat/completions`;
+    const headers: Record<string, string> = {
+      'Content-Type': 'application/json',
+    };
+
+    if (options.apiKey) {
+      headers.Authorization = `Bearer ${options.apiKey}`;
+    }
 
     const response = await fetch(url, {
       method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        Authorization: `Bearer ${options.apiKey}`,
-      },
+      headers,
       body: JSON.stringify({
         model: options.model,
         messages: messages.map((m) => ({ role: m.role, content: m.content })),
@@ -110,4 +117,10 @@ export const ollamaProvider = new OpenAICompatibleProvider(
   'Ollama',
   'http://localhost:11434/v1',
   ['qwen2.5:7b', 'llama3.1:8b', 'deepseek-r1:7b'],
+);
+
+export const customOpenAICompatibleProvider = new OpenAICompatibleProvider(
+  'OpenAI Compatible Custom',
+  '',
+  ['gpt-4o-mini', 'deepseek-chat', 'qwen-plus'],
 );

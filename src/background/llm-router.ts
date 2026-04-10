@@ -4,6 +4,7 @@
 
 import type { LLMMessage, LLMProviderType, LLMConfig } from '@shared/types';
 import { getLLMConfig } from '@shared/storage';
+import { validateLLMConfig } from '@shared/llm-config';
 import type { LLMProvider, StreamOptions } from './providers/base';
 import { claudeProvider } from './providers/claude';
 import {
@@ -14,6 +15,7 @@ import {
   kimiCodeProvider,
   glmProvider,
   ollamaProvider,
+  customOpenAICompatibleProvider,
 } from './providers/openai';
 import { geminiProvider } from './providers/gemini';
 
@@ -27,6 +29,7 @@ const providers: Record<LLMProviderType, LLMProvider> = {
   glm: glmProvider,
   gemini: geminiProvider,
   ollama: ollamaProvider,
+  openai_compatible_custom: customOpenAICompatibleProvider,
 };
 
 function getProvider(config: LLMConfig): LLMProvider {
@@ -46,28 +49,54 @@ function buildOptions(config: LLMConfig): StreamOptions {
 }
 
 /** Stream LLM response using user's configured provider */
-export async function* streamChat(messages: LLMMessage[]): AsyncGenerator<string> {
-  const config = await getLLMConfig();
-  if (!config.apiKey && config.provider !== 'ollama') {
-    throw new Error('当前没有可用的 API Key');
+export async function* streamChat(
+  messages: LLMMessage[],
+  overrideConfig?: Partial<LLMConfig>,
+): AsyncGenerator<string> {
+  const storedConfig = await getLLMConfig();
+  const config: LLMConfig = {
+    ...storedConfig,
+    ...overrideConfig,
+  };
+  const validationError = validateLLMConfig(config);
+  if (validationError) {
+    throw new Error(validationError);
   }
   const provider = getProvider(config);
   yield* provider.chatStream(messages, buildOptions(config));
 }
 
 /** Non-streaming LLM call */
-export async function chat(messages: LLMMessage[]): Promise<string> {
-  const config = await getLLMConfig();
-  if (!config.apiKey && config.provider !== 'ollama') {
-    throw new Error('当前没有可用的 API Key');
+export async function chat(
+  messages: LLMMessage[],
+  overrideConfig?: Partial<LLMConfig>,
+): Promise<string> {
+  const storedConfig = await getLLMConfig();
+  const config: LLMConfig = {
+    ...storedConfig,
+    ...overrideConfig,
+  };
+  const validationError = validateLLMConfig(config);
+  if (validationError) {
+    throw new Error(validationError);
   }
   const provider = getProvider(config);
   return provider.chat(messages, buildOptions(config));
 }
 
 /** Test connection with current settings */
-export async function testConnection(): Promise<{ ok: boolean; error?: string }> {
-  const config = await getLLMConfig();
+export async function testConnection(
+  overrideConfig?: Partial<LLMConfig>,
+): Promise<{ ok: boolean; error?: string }> {
+  const storedConfig = await getLLMConfig();
+  const config: LLMConfig = {
+    ...storedConfig,
+    ...overrideConfig,
+  };
+  const validationError = validateLLMConfig(config);
+  if (validationError) {
+    return { ok: false, error: validationError };
+  }
   const provider = getProvider(config);
   return provider.testConnection(buildOptions(config));
 }
