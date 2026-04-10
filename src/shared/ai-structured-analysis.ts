@@ -35,7 +35,7 @@ function pickValue(source: Record<string, unknown>, keys: string[]): unknown {
 
 function tryParseJson(candidate: string): Record<string, unknown> | null {
   try {
-    const parsed = JSON.parse(candidate) as unknown;
+    const parsed = JSON.parse(sanitizeJsonCandidate(candidate)) as unknown;
     if (typeof parsed === 'string' && parsed.trim()) {
       return tryParseJson(parsed.trim());
     }
@@ -54,11 +54,11 @@ export function parseStructuredAIAnalysis(rawText: string): StructuredAIAnalysis
   if (!trimmed) return null;
 
   const fenceMatch = trimmed.match(/```(?:json)?\s*([\s\S]*?)```/i);
-  const objectMatch = trimmed.match(/\{[\s\S]*\}/);
+  const objectMatch = extractBalancedObject(trimmed);
   const candidates = [
     trimmed,
     fenceMatch?.[1]?.trim(),
-    objectMatch?.[0]?.trim(),
+    objectMatch?.trim(),
     trimmed.replace(/\\"/g, '"').replace(/\\n/g, '\n').trim(),
   ].filter((candidate): candidate is string => Boolean(candidate));
 
@@ -123,6 +123,53 @@ function normalizeTimeframeBias(value: unknown): Record<string, string> | undefi
 
   if (entries.length === 0) return undefined;
   return Object.fromEntries(entries);
+}
+
+function sanitizeJsonCandidate(candidate: string): string {
+  return candidate
+    .trim()
+    .replace(/[“”]/g, '"')
+    .replace(/[‘’]/g, "'")
+    .replace(/,\s*([}\]])/g, '$1');
+}
+
+function extractBalancedObject(text: string): string | null {
+  const start = text.indexOf('{');
+  if (start < 0) return null;
+
+  let depth = 0;
+  let inString = false;
+  let escaped = false;
+
+  for (let index = start; index < text.length; index += 1) {
+    const char = text[index];
+
+    if (escaped) {
+      escaped = false;
+      continue;
+    }
+
+    if (char === '\\') {
+      escaped = true;
+      continue;
+    }
+
+    if (char === '"') {
+      inString = !inString;
+      continue;
+    }
+
+    if (inString) continue;
+
+    if (char === '{') depth += 1;
+    if (char === '}') depth -= 1;
+
+    if (depth === 0) {
+      return text.slice(start, index + 1);
+    }
+  }
+
+  return null;
 }
 
 function parseLabeledText(text: string): StructuredAIAnalysis | null {

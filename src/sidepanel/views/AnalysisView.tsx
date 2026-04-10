@@ -44,6 +44,8 @@ export function AnalysisView() {
   const [usedTimeframes, setUsedTimeframes] = useState<KlinePeriod[]>(['1d']);
   const [baseSectionCollapsed, setBaseSectionCollapsed] = useState(false);
   const [mainSectionCollapsed, setMainSectionCollapsed] = useState(false);
+  const [rawOutputCollapsed, setRawOutputCollapsed] = useState(true);
+  const [compareRawOutputCollapsed, setCompareRawOutputCollapsed] = useState(true);
   const lastAutoRunKeyRef = useRef('');
   const periodOptions: KlinePeriod[] = ['1h', '4h', '1d', '1w'];
 
@@ -166,8 +168,10 @@ export function AnalysisView() {
     setLocalAnalysis(localSummary);
     setAiText('');
     setStructuredAI(null);
+    setRawOutputCollapsed(true);
     setCompareAIText('');
     setCompareStructuredAI(null);
+    setCompareRawOutputCollapsed(true);
     setCompareError('');
     setCompareModelLabel('');
     setError('');
@@ -311,6 +315,7 @@ export function AnalysisView() {
     setCompareStreaming(true);
     setCompareAIText('');
     setCompareStructuredAI(null);
+    setCompareRawOutputCollapsed(true);
     setCompareError('');
     setCompareModelLabel(`${settings.comparison.llm.provider} / ${settings.comparison.llm.model}`);
 
@@ -579,9 +584,17 @@ export function AnalysisView() {
                 <StructuredAISection analysis={effectiveStructuredAI} />
               ) : (
                 aiText && (
-                  <div className="analysis-content markdown-body">
-                    <ReactMarkdown>{aiText}</ReactMarkdown>
-                  </div>
+                  <CollapsibleSection
+                    title="原始模型输出"
+                    subtitle="当前还没能稳定解析成卡片，你也可以展开查看原文。"
+                    collapsed={rawOutputCollapsed}
+                    onToggle={() => setRawOutputCollapsed((current) => !current)}
+                    badge="原始文本"
+                  >
+                    <div className="analysis-content markdown-body">
+                      <ReactMarkdown>{aiText}</ReactMarkdown>
+                    </div>
+                  </CollapsibleSection>
                 )
               )}
 
@@ -617,9 +630,17 @@ export function AnalysisView() {
                 compareAIText && (
                   <>
                     <div className="info-note">对比模型未返回结构化 JSON，以下为原始文本。</div>
-                    <div className="analysis-content markdown-body">
-                      <ReactMarkdown>{compareAIText}</ReactMarkdown>
-                    </div>
+                    <CollapsibleSection
+                      title="对比模型原始输出"
+                      subtitle="当前只保留原文，避免直接把整屏内容铺开。"
+                      collapsed={compareRawOutputCollapsed}
+                      onToggle={() => setCompareRawOutputCollapsed((current) => !current)}
+                      badge="原始文本"
+                    >
+                      <div className="analysis-content markdown-body">
+                        <ReactMarkdown>{compareAIText}</ReactMarkdown>
+                      </div>
+                    </CollapsibleSection>
                   </>
                 )
               )}

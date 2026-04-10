@@ -145,4 +145,32 @@ describe('parseStructuredAIAnalysis', () => {
       risks: ['成交量不足', '大盘波动放大'],
     });
   });
+
+  it('parses json with trailing commas and extra wrapper text', () => {
+    const result = parseStructuredAIAnalysis([
+      '以下是分析结果：',
+      '{',
+      '  "summary": "短线回踩但结构没坏",',
+      '  "trend": "震荡偏强",',
+      '  "confidence": 68,',
+      '  "supportLevels": [180.5, 176.2,],',
+      '  "resistanceLevels": [190.8, 195.4,],',
+      '  "suggestion": "先等回踩确认。",',
+      '}',
+    ].join('\n'));
+
+    expect(result).toEqual({
+      summary: '短线回踩但结构没坏',
+      trend: '震荡偏强',
+      confidence: 68,
+      reasoning: [],
+      signals: [],
+      timeframeBias: undefined,
+      primaryTimeframe: undefined,
+      supportLevels: [180.5, 176.2],
+      resistanceLevels: [190.8, 195.4],
+      suggestion: '先等回踩确认。',
+      risks: [],
+    });
+  });
 });
