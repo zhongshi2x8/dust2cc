@@ -234,6 +234,26 @@ body.extension-popup .app {
   gap: 8px;
 }
 
+.analysis-summary-card {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 12px;
+  border-radius: 10px;
+  background: linear-gradient(145deg, rgba(92, 107, 192, 0.2), rgba(38, 42, 84, 0.7));
+  border: 1px solid rgba(127, 140, 255, 0.28);
+}
+
+.analysis-summary-card strong {
+  color: #eef2ff;
+  font-size: 14px;
+}
+
+.analysis-summary-card span {
+  color: #c7d2fe;
+  font-size: 12px;
+}
+
 .analysis-meta-row {
   display: flex;
   flex-wrap: wrap;

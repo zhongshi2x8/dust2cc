@@ -32,16 +32,22 @@ export class OpenAICompatibleProvider extends BaseLLMProvider {
       headers.Authorization = `Bearer ${options.apiKey}`;
     }
 
+    const requestBody: Record<string, unknown> = {
+      model: options.model,
+      messages: messages.map((m) => ({ role: m.role, content: m.content })),
+      stream: true,
+      temperature: options.temperature ?? 0.3,
+      max_tokens: options.maxTokens ?? 2000,
+    };
+
+    if (this.supportsNativeJsonMode(options.baseUrl)) {
+      requestBody.response_format = { type: 'json_object' };
+    }
+
     const response = await fetch(url, {
       method: 'POST',
       headers,
-      body: JSON.stringify({
-        model: options.model,
-        messages: messages.map((m) => ({ role: m.role, content: m.content })),
-        stream: true,
-        temperature: options.temperature ?? 0.3,
-        max_tokens: options.maxTokens ?? 2000,
-      }),
+      body: JSON.stringify(requestBody),
     });
 
     if (!response.ok) {
@@ -73,6 +79,21 @@ export class OpenAICompatibleProvider extends BaseLLMProvider {
         }
       }
     }
+  }
+
+  private supportsNativeJsonMode(baseUrl?: string): boolean {
+    const normalizedBaseUrl = (baseUrl?.trim() || this.defaultBaseUrl).toLowerCase();
+    if (!normalizedBaseUrl) return false;
+    if (normalizedBaseUrl.includes('localhost') || normalizedBaseUrl.includes('127.0.0.1')) return false;
+
+    return [
+      'openai',
+      'deepseek',
+      'qwen',
+      'moonshot kimi',
+      'kimi code',
+      'glm',
+    ].includes(this.name.toLowerCase());
   }
 }
 

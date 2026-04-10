@@ -506,6 +506,16 @@ export function AnalysisView() {
           </div>
 
           <div className="analysis-meta-panel">
+            {effectiveStructuredAI && (
+              <div className="analysis-summary-card">
+                <strong>{effectiveStructuredAI.summary || effectiveStructuredAI.trend || 'AI 已生成结论'}</strong>
+                <span>
+                  趋势：{effectiveStructuredAI.trend || '未给出'}
+                  {' · '}
+                  置信度：{effectiveStructuredAI.confidence}%
+                </span>
+              </div>
+            )}
             <div className="analysis-meta-row">
               <span className="meta-chip">分析模式：{currentModeLabel}</span>
               <span className="meta-chip">分析风格：{getAnalysisStyleLabel(analysisStyle)}</span>

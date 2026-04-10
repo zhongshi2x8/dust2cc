@@ -108,4 +108,41 @@ describe('parseStructuredAIAnalysis', () => {
       risks: [],
     });
   });
+
+  it('parses labeled chinese text as structured fallback', () => {
+    const result = parseStructuredAIAnalysis([
+      '核心结论：大盘价格仍偏强，但短线震荡加剧。',
+      '趋势：震荡偏强',
+      '置信度：72',
+      '推理依据：',
+      '- 价格仍站在 MA20 上方',
+      '- MACD 尚未形成明确死叉',
+      '信号：',
+      '- RSI 接近强弱分界',
+      '- 量能略有收缩',
+      '支撑位：182.5, 176.2',
+      '压力位：195.8, 201.4',
+      '建议：等待回踩确认后再考虑跟进。',
+      '风险提示：',
+      '- 成交量不足',
+      '- 大盘波动放大',
+      '主周期：1d',
+      '1h：短线震荡',
+      '1d：中期偏强',
+    ].join('\n'));
+
+    expect(result).toEqual({
+      summary: '大盘价格仍偏强，但短线震荡加剧。',
+      trend: '震荡偏强',
+      confidence: 72,
+      reasoning: ['价格仍站在 MA20 上方', 'MACD 尚未形成明确死叉'],
+      signals: ['RSI 接近强弱分界', '量能略有收缩'],
+      timeframeBias: { '1h': '短线震荡', '1d': '中期偏强' },
+      primaryTimeframe: '1d',
+      supportLevels: [182.5, 176.2],
+      resistanceLevels: [195.8, 201.4],
+      suggestion: '等待回踩确认后再考虑跟进。',
+      risks: ['成交量不足', '大盘波动放大'],
+    });
+  });
 });

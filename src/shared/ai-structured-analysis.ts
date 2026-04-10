@@ -106,6 +106,11 @@ export function parseStructuredAIAnalysis(rawText: string): StructuredAIAnalysis
     }
   }
 
+  const textFallback = parseLabeledText(trimmed);
+  if (textFallback) {
+    return textFallback;
+  }
+
   return null;
 }
 
@@ -118,4 +123,101 @@ function normalizeTimeframeBias(value: unknown): Record<string, string> | undefi
 
   if (entries.length === 0) return undefined;
   return Object.fromEntries(entries);
+}
+
+function parseLabeledText(text: string): StructuredAIAnalysis | null {
+  const summary = extractLabeledValue(text, ['summary', '核心结论', '结论']);
+  const trend = extractLabeledValue(text, ['trend', '趋势']);
+  const confidenceText = extractLabeledValue(text, ['confidence', '置信度']);
+  const suggestion = extractLabeledValue(text, ['suggestion', '建议']);
+  const primaryTimeframe = extractLabeledValue(text, ['primaryTimeframe', '主周期', '主分析周期']);
+  const reasoning = extractBulletBlock(text, ['reasoning', '推理依据', '依据']);
+  const signals = extractBulletBlock(text, ['signals', '信号']);
+  const risks = extractBulletBlock(text, ['risks', '风险提示']);
+  const supportLevels = extractNumberList(extractLabeledValue(text, ['supportLevels', '支撑位']));
+  const resistanceLevels = extractNumberList(extractLabeledValue(text, ['resistanceLevels', '压力位']));
+  const timeframeBias = extractTimeframeBias(text);
+  const normalized: StructuredAIAnalysis = {
+    summary,
+    trend,
+    confidence: clampConfidence(confidenceText ? Number(confidenceText.replace(/[^\d.]/g, '')) : 0),
+    reasoning,
+    signals,
+    supportLevels,
+    resistanceLevels,
+    suggestion,
+    risks,
+    timeframeBias,
+    primaryTimeframe: primaryTimeframe || undefined,
+  };
+
+  if (
+    normalized.summary
+    || normalized.trend
+    || normalized.reasoning.length > 0
+    || normalized.signals.length > 0
+    || normalized.suggestion
+    || normalized.supportLevels.length > 0
+    || normalized.resistanceLevels.length > 0
+    || normalized.risks.length > 0
+  ) {
+    return normalized;
+  }
+
+  return null;
+}
+
+function extractLabeledValue(text: string, labels: string[]): string {
+  for (const label of labels) {
+    const match = text.match(new RegExp(`(?:^|\\n)\\s*${escapeRegExp(label)}\\s*[:：]\\s*(.+)`, 'i'));
+    if (match?.[1]) {
+      return match[1].trim();
+    }
+  }
+  return '';
+}
+
+function extractBulletBlock(text: string, labels: string[]): string[] {
+  for (const label of labels) {
+    const blockMatch = text.match(new RegExp(`(?:^|\\n)\\s*${escapeRegExp(label)}\\s*[:：]\\s*([\\s\\S]*?)(?=\\n\\s*[A-Za-z\\u4e00-\\u9fa5]+\\s*[:：]|$)`, 'i'));
+    const block = blockMatch?.[1]?.trim();
+    if (!block) continue;
+
+    const bulletItems = block
+      .split('\n')
+      .map((line) => line.replace(/^[\-\d.\s、]+/, '').trim())
+      .filter(Boolean);
+
+    if (bulletItems.length > 0) {
+      return bulletItems;
+    }
+
+    return normalizeStringArray(block.replace(/[；;]/g, '\n'));
+  }
+
+  return [];
+}
+
+function extractNumberList(value: string): number[] {
+  if (!value) return [];
+  return value
+    .split(/[、,，/ ]+/)
+    .map((entry) => Number(entry.replace(/[^\d.-]/g, '')))
+    .filter((entry) => Number.isFinite(entry));
+}
+
+function extractTimeframeBias(text: string): Record<string, string> | undefined {
+  const matches = Array.from(text.matchAll(/(?:^|\n)\s*(1h|4h|1d|1w|1M)\s*[:：]\s*(.+)/g));
+  if (matches.length === 0) return undefined;
+
+  const entries = matches
+    .map((match) => [match[1], match[2].trim()] as const)
+    .filter(([, value]) => Boolean(value));
+
+  if (entries.length === 0) return undefined;
+  return Object.fromEntries(entries);
+}
+
+function escapeRegExp(value: string): string {
+  return value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 }
