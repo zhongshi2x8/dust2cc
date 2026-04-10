@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
-import { mergeSettings, normalizeSettings } from './storage';
+import type { AnalysisHistoryEntry } from './types';
+import { ANALYSIS_HISTORY_LIMIT, mergeSettings, normalizeSettings, trimAnalysisHistory } from './storage';
 
 describe('normalizeSettings', () => {
   it('maps legacy custom provider to openai_compatible_custom', () => {
@@ -99,5 +100,34 @@ describe('mergeSettings', () => {
     expect(merged.comparison.llm.provider).toBe('openai_compatible_custom');
     expect(merged.comparison.llm.baseUrl).toBe('https://compare.example.com/v1');
     expect(merged.comparison.llm.maxTokens).toBe(2000);
+  });
+});
+
+describe('trimAnalysisHistory', () => {
+  it('keeps only the newest 50 records', () => {
+    const entries = Array.from({ length: ANALYSIS_HISTORY_LIMIT + 7 }, (_, index) => ({
+      id: `entry-${index}`,
+      createdAt: ANALYSIS_HISTORY_LIMIT + 7 - index,
+      goodsId: `goods-${index}`,
+      goodsName: `饰品 ${index}`,
+      price: 100 + index,
+      period: '1d' as const,
+      periodMode: 'single' as const,
+      analysisStyle: 'balanced' as const,
+      primaryTimeframe: '1d' as const,
+      usedTimeframes: ['1d'] as const,
+      localSignal: {
+        action: 'hold' as const,
+        confidence: 50,
+        reason: 'test',
+      },
+      localAnalysis: 'local',
+    })) satisfies AnalysisHistoryEntry[];
+
+    const trimmed = trimAnalysisHistory(entries);
+
+    expect(trimmed).toHaveLength(ANALYSIS_HISTORY_LIMIT);
+    expect(trimmed[0].id).toBe('entry-0');
+    expect(trimmed.at(-1)?.id).toBe(`entry-${ANALYSIS_HISTORY_LIMIT - 1}`);
   });
 });

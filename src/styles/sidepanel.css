@@ -228,6 +228,29 @@ body.extension-popup .app {
   font-size: 12px;
 }
 
+.analysis-meta-panel {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.analysis-meta-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.meta-chip {
+  display: inline-flex;
+  align-items: center;
+  padding: 6px 10px;
+  border-radius: 999px;
+  background: rgba(127, 140, 255, 0.14);
+  border: 1px solid rgba(127, 140, 255, 0.22);
+  color: #dfe4ff;
+  font-size: 12px;
+}
+
 .copy-actions {
   display: flex;
   gap: 10px;
@@ -258,6 +281,28 @@ body.extension-popup .app {
   color: #dfe4ff;
   cursor: pointer;
   font-size: 13px;
+}
+
+.compare-actions {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.subtle-note {
+  color: #9aa3d6;
+  font-size: 12px;
+  line-height: 1.5;
+}
+
+.model-analysis-section {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.compare-section {
+  margin-top: 4px;
 }
 
 .analysis-content {
@@ -435,6 +480,29 @@ body.extension-popup .app {
   display: flex;
   flex-direction: column;
   gap: 10px;
+}
+
+.confirm-inline {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 12px;
+  border-radius: 10px;
+  border: 1px solid rgba(235, 75, 75, 0.35);
+  background: rgba(58, 26, 26, 0.55);
+  color: #ffd6d6;
+  font-size: 13px;
+}
+
+.confirm-inline-actions {
+  display: flex;
+  gap: 10px;
+}
+
+.ghost-btn {
+  background: transparent;
+  border: 1px solid #5e688f;
+  color: #cfd5f6;
 }
 
 .app.popup-mode .settings-view {
@@ -715,4 +783,30 @@ body.extension-popup .app {
 .structured-ai-risks {
   margin-left: 18px;
   color: #dfe4ff;
+}
+
+.timeframe-bias-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.timeframe-bias-item {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 8px 10px;
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid rgba(255, 255, 255, 0.06);
+}
+
+.timeframe-bias-item.primary {
+  border-color: rgba(127, 140, 255, 0.4);
+  background: rgba(127, 140, 255, 0.14);
+}
+
+.timeframe-bias-period {
+  color: #9aa3d6;
+  font-size: 12px;
 }

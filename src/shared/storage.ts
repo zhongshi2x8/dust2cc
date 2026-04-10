@@ -218,7 +218,11 @@ export async function clearCache(): Promise<void> {
 }
 
 const ANALYSIS_HISTORY_KEY = 'analysisHistory';
-const ANALYSIS_HISTORY_LIMIT = 50;
+export const ANALYSIS_HISTORY_LIMIT = 50;
+
+export function trimAnalysisHistory(entries: AnalysisHistoryEntry[]): AnalysisHistoryEntry[] {
+  return entries.slice(0, ANALYSIS_HISTORY_LIMIT);
+}
 
 export async function getAnalysisHistory(): Promise<AnalysisHistoryEntry[]> {
   const result = await chrome.storage.local.get(ANALYSIS_HISTORY_KEY);
@@ -227,7 +231,7 @@ export async function getAnalysisHistory(): Promise<AnalysisHistoryEntry[]> {
 
 export async function saveAnalysisHistoryEntry(entry: AnalysisHistoryEntry): Promise<void> {
   const history = await getAnalysisHistory();
-  const nextHistory = [entry, ...history].slice(0, ANALYSIS_HISTORY_LIMIT);
+  const nextHistory = trimAnalysisHistory([entry, ...history]);
   await chrome.storage.local.set({ [ANALYSIS_HISTORY_KEY]: nextHistory });
 }
 

@@ -55,4 +55,20 @@ describe('validateLLMConfig', () => {
     expect(providerAllowsNoApiKey(llm)).toBe(true);
     expect(validateLLMConfig(llm)).toBeNull();
   });
+
+  it('validates compare config with the same custom rules when enabled', () => {
+    const compareLLM = normalizeSettings({
+      comparison: {
+        enabled: true,
+        llm: {
+          provider: 'openai_compatible_custom',
+          apiKey: '',
+          baseUrl: 'https://proxy.example.com/v1',
+          model: 'gpt-4o-mini',
+        },
+      },
+    }).comparison.llm;
+
+    expect(validateLLMConfig(compareLLM)).toBe('请先填写 API Key');
+  });
 });

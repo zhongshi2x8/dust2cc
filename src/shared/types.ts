@@ -276,6 +276,10 @@ export interface AnalysisHistoryEntry {
   goodsName: string;
   price: number;
   period: KlinePeriod;
+  periodMode: AnalysisPeriodMode;
+  analysisStyle: AnalysisStyle;
+  primaryTimeframe?: KlinePeriod;
+  usedTimeframes?: KlinePeriod[];
   localSignal: Pick<TradeSignal, 'action' | 'confidence' | 'reason'>;
   localAnalysis: string;
   structuredAI?: StructuredAIAnalysis;
