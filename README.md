@@ -1,6 +1,6 @@
 # dust2.cc 🧙
 
-一个面向 CS2 饰品行情分析的 Chrome Manifest V3 扩展。
+对 csqaq 和 steamdt 的饰品k线以及大盘k线进行AI分析的插件工具。
 
 ## ✨ 功能特性
 
