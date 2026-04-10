@@ -29,6 +29,7 @@ export function AnalysisView() {
   const [structuredAI, setStructuredAI] = useState<StructuredAIAnalysis | null>(null);
   const [streaming, setStreaming] = useState(false);
   const [mainModelLabel, setMainModelLabel] = useState('');
+  const [hasConfiguredPrimaryModel, setHasConfiguredPrimaryModel] = useState(false);
   const [compareAIText, setCompareAIText] = useState('');
   const [compareStructuredAI, setCompareStructuredAI] = useState<StructuredAIAnalysis | null>(null);
   const [compareStreaming, setCompareStreaming] = useState(false);
@@ -41,17 +42,23 @@ export function AnalysisView() {
   const [periodMode, setPeriodMode] = useState<AnalysisPeriodMode>('single');
   const [analysisStyle, setAnalysisStyle] = useState<AnalysisStyle>('balanced');
   const [usedTimeframes, setUsedTimeframes] = useState<KlinePeriod[]>(['1d']);
+  const [baseSectionCollapsed, setBaseSectionCollapsed] = useState(false);
+  const [mainSectionCollapsed, setMainSectionCollapsed] = useState(false);
   const lastAutoRunKeyRef = useRef('');
   const periodOptions: KlinePeriod[] = ['1h', '4h', '1d', '1w'];
 
   useEffect(() => {
     requestActivePageState().then(setPageData);
     getSettings().then((settings) => {
+      const primaryModelConfigured = validateLLMConfig(settings.llm) === null;
       setSelectedPeriod(settings.analysis.defaultPeriod);
       setPeriodMode(settings.analysis.periodMode);
       setAnalysisStyle(settings.analysis.aiStyle);
       setCompareEnabled(settings.comparison.enabled);
       setMainModelLabel(`${settings.llm.provider} / ${settings.llm.model}`);
+      setHasConfiguredPrimaryModel(primaryModelConfigured);
+      setBaseSectionCollapsed(primaryModelConfigured);
+      setMainSectionCollapsed(false);
     });
 
     const listener = (msg: { type: string; data?: unknown }) => {
@@ -87,6 +94,11 @@ export function AnalysisView() {
         )
       : null;
 
+  const effectiveStructuredAI = useMemo(
+    () => structuredAI || parseStructuredAIAnalysis(aiText),
+    [aiText, structuredAI],
+  );
+
   const effectivePeriodMode: AnalysisPeriodMode = periodMode === 'multi' && usedTimeframes.length > 1 ? 'multi' : 'single';
   const currentModeLabel = getPeriodModeLabel(effectivePeriodMode);
   const onlyOneTimeframeDetected = periodMode === 'multi' && usedTimeframes.length <= 1;
@@ -97,11 +109,11 @@ export function AnalysisView() {
 
   const mainSummaryText = useMemo(() => {
     if (streaming) return '模型正在生成结构化结论...';
-    if (structuredAI) return '已按结构化字段渲染，可直接复制和留档。';
+    if (effectiveStructuredAI) return '已按结构化字段渲染，可直接复制和留档。';
     if (aiText) return '模型未返回有效 JSON，已自动回退到原始文本显示。';
     if (localAnalysis) return '当前先展示本地分析结果，AI 结果会在可用时自动补充。';
     return '';
-  }, [aiText, localAnalysis, streaming, structuredAI]);
+  }, [aiText, effectiveStructuredAI, localAnalysis, streaming]);
 
   async function handlePeriodChange(period: KlinePeriod) {
     setSelectedPeriod(period);
@@ -163,6 +175,8 @@ export function AnalysisView() {
     setAnalysisStyle(settings.analysis.aiStyle);
     setCompareEnabled(settings.comparison.enabled);
     setMainModelLabel(`${settings.llm.provider} / ${settings.llm.model}`);
+    const primaryModelConfigured = validateLLMConfig(settings.llm) === null;
+    setHasConfiguredPrimaryModel(primaryModelConfigured);
 
     const validationError = validateLLMConfig(settings.llm);
     if (validationError) {
@@ -390,17 +404,17 @@ export function AnalysisView() {
     const goodsName = pageData?.goodsInfo?.zhName || pageData?.goodsInfo?.name || '未知饰品';
     const content =
       mode === 'short'
-        ? (structuredAI ? buildShortCopyText(goodsName, structuredAI, {
+        ? (effectiveStructuredAI ? buildShortCopyText(goodsName, effectiveStructuredAI, {
             periodMode,
             effectivePeriodMode,
-            primaryTimeframe: structuredAI.primaryTimeframe || selectedPeriod,
+            primaryTimeframe: effectiveStructuredAI.primaryTimeframe || selectedPeriod,
             usedTimeframes,
           }) : '')
-        : buildFullCopyText(goodsName, signal, structuredAI, aiText, {
+        : buildFullCopyText(goodsName, signal, effectiveStructuredAI, aiText, {
             style: analysisStyle,
             periodMode,
             effectivePeriodMode,
-            primaryTimeframe: structuredAI?.primaryTimeframe || selectedPeriod,
+            primaryTimeframe: effectiveStructuredAI?.primaryTimeframe || selectedPeriod,
             usedTimeframes,
           });
 
@@ -472,9 +486,16 @@ export function AnalysisView() {
       {error && <div className="error-msg">❌ {error}</div>}
 
       {localAnalysis && (
-        <div className="analysis-content markdown-body">
-          <ReactMarkdown>{localAnalysis}</ReactMarkdown>
-        </div>
+        <CollapsibleSection
+          title="本地基础分析"
+          subtitle={hasConfiguredPrimaryModel ? '已配置主模型，默认收起以便优先查看 AI 结果。' : '当前没有可用主模型，默认展开基础分析。'}
+          collapsed={baseSectionCollapsed}
+          onToggle={() => setBaseSectionCollapsed((current) => !current)}
+        >
+          <div className="analysis-content markdown-body">
+            <ReactMarkdown>{localAnalysis}</ReactMarkdown>
+          </div>
+        </CollapsibleSection>
       )}
 
       {hasAISection && (
@@ -501,13 +522,13 @@ export function AnalysisView() {
             )}
           </div>
 
-          {(structuredAI || aiText) && (
+          {(effectiveStructuredAI || aiText) && (
             <div className="copy-actions">
               <button
                 type="button"
                 onClick={() => void handleCopy('short')}
-                disabled={!structuredAI}
-                title={!structuredAI ? '只有结构化 AI 结果才能生成简版结论。' : '复制适合发群和发消息的简版结论'}
+                disabled={!effectiveStructuredAI}
+                title={!effectiveStructuredAI ? '只有结构化 AI 结果才能生成简版结论。' : '复制适合发群和发消息的简版结论'}
               >
                 复制简版结论
               </button>
@@ -536,26 +557,29 @@ export function AnalysisView() {
           {copyNotice && <div className="info-note">{copyNotice}</div>}
           {compareError && <div className="error-msg">❌ {compareError}</div>}
 
-          <div className="model-analysis-section">
-            <div className="selection-summary">
-              <strong>主模型分析</strong>
-              <span>{mainModelLabel || '未配置模型'}</span>
+          <CollapsibleSection
+            title="主模型分析"
+            subtitle={mainModelLabel || '未配置模型'}
+            collapsed={mainSectionCollapsed}
+            onToggle={() => setMainSectionCollapsed((current) => !current)}
+            badge={streaming ? '分析中' : effectiveStructuredAI ? '已完成' : aiText ? '原始文本' : undefined}
+          >
+            <div className="model-analysis-section">
+              {effectiveStructuredAI ? (
+                <StructuredAISection analysis={effectiveStructuredAI} />
+              ) : (
+                aiText && (
+                  <div className="analysis-content markdown-body">
+                    <ReactMarkdown>{aiText}</ReactMarkdown>
+                  </div>
+                )
+              )}
+
+              {!streaming && !effectiveStructuredAI && !aiText && (
+                <div className="info-note">当前没有可显示的 AI 输出，已保留本地分析结果。</div>
+              )}
             </div>
-
-            {structuredAI ? (
-              <StructuredAISection analysis={structuredAI} />
-            ) : (
-              aiText && (
-                <div className="analysis-content markdown-body">
-                  <ReactMarkdown>{aiText}</ReactMarkdown>
-                </div>
-              )
-            )}
-
-            {!streaming && !structuredAI && !aiText && (
-              <div className="info-note">当前没有可显示的 AI 输出，已保留本地分析结果。</div>
-            )}
-          </div>
+          </CollapsibleSection>
 
           {(compareStreaming || compareStructuredAI || compareAIText) && (
             <div className="model-analysis-section compare-section">
@@ -613,6 +637,38 @@ function SignalCard({ signal }: { signal: TradeSignal }) {
         </div>
         <div className="signal-reason">{signal.reason}</div>
       </div>
+    </div>
+  );
+}
+
+function CollapsibleSection({
+  title,
+  subtitle,
+  badge,
+  collapsed,
+  onToggle,
+  children,
+}: {
+  title: string;
+  subtitle?: string;
+  badge?: string;
+  collapsed: boolean;
+  onToggle: () => void;
+  children: React.ReactNode;
+}) {
+  return (
+    <div className="collapsible-section">
+      <button type="button" className="collapsible-header" onClick={onToggle}>
+        <div className="collapsible-copy">
+          <strong>{title}</strong>
+          {subtitle ? <span>{subtitle}</span> : null}
+        </div>
+        <div className="collapsible-actions">
+          {badge ? <span className="provider-badge subtle">{badge}</span> : null}
+          <span className={`collapsible-caret ${collapsed ? 'collapsed' : ''}`}>⌄</span>
+        </div>
+      </button>
+      {!collapsed ? children : null}
     </div>
   );
 }

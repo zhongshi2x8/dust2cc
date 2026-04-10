@@ -90,4 +90,22 @@ describe('parseStructuredAIAnalysis', () => {
   it('returns null for non-json output', () => {
     expect(parseStructuredAIAnalysis('这是普通文本，不是 JSON')).toBeNull();
   });
+
+  it('parses stringified json payloads', () => {
+    const result = parseStructuredAIAnalysis(`"{\\"summary\\":\\"测试结论\\",\\"trend\\":\\"偏多\\",\\"confidence\\":66,\\"suggestion\\":\\"等回踩确认后再考虑。\\"}"`);
+
+    expect(result).toEqual({
+      summary: '测试结论',
+      trend: '偏多',
+      confidence: 66,
+      reasoning: [],
+      signals: [],
+      timeframeBias: undefined,
+      primaryTimeframe: undefined,
+      supportLevels: [],
+      resistanceLevels: [],
+      suggestion: '等回踩确认后再考虑。',
+      risks: [],
+    });
+  });
 });

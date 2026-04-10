@@ -36,6 +36,9 @@ function pickValue(source: Record<string, unknown>, keys: string[]): unknown {
 function tryParseJson(candidate: string): Record<string, unknown> | null {
   try {
     const parsed = JSON.parse(candidate) as unknown;
+    if (typeof parsed === 'string' && parsed.trim()) {
+      return tryParseJson(parsed.trim());
+    }
     if (parsed && typeof parsed === 'object' && !Array.isArray(parsed)) {
       return parsed as Record<string, unknown>;
     }
@@ -56,6 +59,7 @@ export function parseStructuredAIAnalysis(rawText: string): StructuredAIAnalysis
     trimmed,
     fenceMatch?.[1]?.trim(),
     objectMatch?.[0]?.trim(),
+    trimmed.replace(/\\"/g, '"').replace(/\\n/g, '\n').trim(),
   ].filter((candidate): candidate is string => Boolean(candidate));
 
   for (const candidate of candidates) {
