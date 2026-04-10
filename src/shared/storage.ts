@@ -4,6 +4,13 @@
 
 import type { UserSettings, CachedAnalysis, LLMConfig } from './types';
 
+export interface SettingsPatch {
+  llm?: Partial<LLMConfig>;
+  analysis?: Partial<UserSettings['analysis']>;
+  ui?: Partial<UserSettings['ui']>;
+  advanced?: Partial<UserSettings['advanced']>;
+}
+
 const DEFAULT_SETTINGS: UserSettings = {
   llm: {
     provider: 'deepseek',
@@ -29,7 +36,19 @@ const DEFAULT_SETTINGS: UserSettings = {
   },
 };
 
-function normalizeSettings(rawSettings: Partial<UserSettings> | undefined): UserSettings {
+const LEGACY_CUSTOM_PROVIDER = 'custom';
+
+function clampTemperature(value: unknown, fallback: number): number {
+  if (typeof value !== 'number' || Number.isNaN(value)) return fallback;
+  return Math.min(2, Math.max(0, value));
+}
+
+function normalizeMaxTokens(value: unknown, fallback: number): number {
+  if (typeof value !== 'number' || Number.isNaN(value)) return fallback;
+  return Math.max(1, Math.round(value));
+}
+
+export function normalizeSettings(rawSettings: SettingsPatch | undefined): UserSettings {
   const merged: UserSettings = {
     ...DEFAULT_SETTINGS,
     ...rawSettings,
@@ -51,13 +70,43 @@ function normalizeSettings(rawSettings: Partial<UserSettings> | undefined): User
     },
   };
 
-  if ((merged.llm.provider as string) === 'custom') {
-    merged.llm.provider = DEFAULT_SETTINGS.llm.provider;
-    merged.llm.model = DEFAULT_SETTINGS.llm.model;
-    merged.llm.baseUrl = undefined;
+  if ((merged.llm.provider as string) === LEGACY_CUSTOM_PROVIDER) {
+    merged.llm.provider = 'openai_compatible_custom';
   }
 
+  merged.llm.apiKey = merged.llm.apiKey.trim();
+  merged.llm.model = merged.llm.model.trim() || DEFAULT_SETTINGS.llm.model;
+  merged.llm.baseUrl = merged.llm.baseUrl?.trim() || undefined;
+  merged.llm.temperature = clampTemperature(merged.llm.temperature, DEFAULT_SETTINGS.llm.temperature);
+  merged.llm.maxTokens = normalizeMaxTokens(merged.llm.maxTokens, DEFAULT_SETTINGS.llm.maxTokens);
+
   return merged;
+}
+
+export function mergeSettings(
+  current: UserSettings,
+  next: SettingsPatch,
+): UserSettings {
+  return normalizeSettings({
+    ...current,
+    ...next,
+    llm: {
+      ...current.llm,
+      ...(next.llm || {}),
+    },
+    analysis: {
+      ...current.analysis,
+      ...(next.analysis || {}),
+    },
+    ui: {
+      ...current.ui,
+      ...(next.ui || {}),
+    },
+    advanced: {
+      ...current.advanced,
+      ...(next.advanced || {}),
+    },
+  });
 }
 
 /** Get user settings, merged with defaults */
@@ -67,9 +116,9 @@ export async function getSettings(): Promise<UserSettings> {
 }
 
 /** Save user settings */
-export async function saveSettings(settings: Partial<UserSettings>): Promise<void> {
+export async function saveSettings(settings: SettingsPatch): Promise<void> {
   const current = await getSettings();
-  await chrome.storage.local.set({ settings: normalizeSettings({ ...current, ...settings }) });
+  await chrome.storage.local.set({ settings: mergeSettings(current, settings) });
 }
 
 /** Get LLM config from settings */

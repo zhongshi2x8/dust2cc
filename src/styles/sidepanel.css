@@ -49,10 +49,6 @@ body.extension-popup .app {
   font-size: 12px;
 }
 
-.app.popup-mode .app-nav {
-  display: none;
-}
-
 .app.popup-mode .app-main {
   padding: 12px;
 }
@@ -475,7 +471,8 @@ body.extension-popup .app {
 
 .form-group select,
 .form-group input[type="text"],
-.form-group input[type="password"] {
+.form-group input[type="password"],
+.form-group input[type="number"] {
   padding: 10px 12px;
   border: 1px solid #444;
   border-radius: 8px;
@@ -487,7 +484,8 @@ body.extension-popup .app {
 
 .app.popup-mode .form-group select,
 .app.popup-mode .form-group input[type="text"],
-.app.popup-mode .form-group input[type="password"] {
+.app.popup-mode .form-group input[type="password"],
+.app.popup-mode .form-group input[type="number"] {
   padding: 9px 10px;
   font-size: 12px;
 }
@@ -530,4 +528,48 @@ body.extension-popup .app {
 
 .test-result {
   font-size: 13px;
+}
+
+.test-result.success-text {
+  color: #8ce99a;
+}
+
+.test-result.error-text {
+  color: #ff9f9f;
+}
+
+.structured-ai-card {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 12px;
+  border-radius: 12px;
+  border: 1px solid #333a60;
+  background: #202445;
+}
+
+.structured-ai-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.structured-ai-block {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 10px;
+  border-radius: 10px;
+  background: rgba(12, 16, 36, 0.55);
+  border: 1px solid rgba(127, 140, 255, 0.14);
+}
+
+.structured-ai-label {
+  font-size: 12px;
+  color: #9aa3d6;
+}
+
+.structured-ai-risks {
+  margin-left: 18px;
+  color: #dfe4ff;
 }

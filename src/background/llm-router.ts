@@ -14,6 +14,7 @@ import {
   kimiCodeProvider,
   glmProvider,
   ollamaProvider,
+  customOpenAICompatibleProvider,
 } from './providers/openai';
 import { geminiProvider } from './providers/gemini';
 
@@ -27,7 +28,12 @@ const providers: Record<LLMProviderType, LLMProvider> = {
   glm: glmProvider,
   gemini: geminiProvider,
   ollama: ollamaProvider,
+  openai_compatible_custom: customOpenAICompatibleProvider,
 };
+
+function providerRequiresApiKey(providerType: LLMProviderType): boolean {
+  return providerType !== 'ollama' && providerType !== 'openai_compatible_custom';
+}
 
 function getProvider(config: LLMConfig): LLMProvider {
   const provider = providers[config.provider];
@@ -48,7 +54,7 @@ function buildOptions(config: LLMConfig): StreamOptions {
 /** Stream LLM response using user's configured provider */
 export async function* streamChat(messages: LLMMessage[]): AsyncGenerator<string> {
   const config = await getLLMConfig();
-  if (!config.apiKey && config.provider !== 'ollama') {
+  if (!config.apiKey && providerRequiresApiKey(config.provider)) {
     throw new Error('当前没有可用的 API Key');
   }
   const provider = getProvider(config);
@@ -58,7 +64,7 @@ export async function* streamChat(messages: LLMMessage[]): AsyncGenerator<string
 /** Non-streaming LLM call */
 export async function chat(messages: LLMMessage[]): Promise<string> {
   const config = await getLLMConfig();
-  if (!config.apiKey && config.provider !== 'ollama') {
+  if (!config.apiKey && providerRequiresApiKey(config.provider)) {
     throw new Error('当前没有可用的 API Key');
   }
   const provider = getProvider(config);
@@ -66,8 +72,14 @@ export async function chat(messages: LLMMessage[]): Promise<string> {
 }
 
 /** Test connection with current settings */
-export async function testConnection(): Promise<{ ok: boolean; error?: string }> {
-  const config = await getLLMConfig();
+export async function testConnection(
+  overrideConfig?: Partial<LLMConfig>,
+): Promise<{ ok: boolean; error?: string }> {
+  const storedConfig = await getLLMConfig();
+  const config: LLMConfig = {
+    ...storedConfig,
+    ...overrideConfig,
+  };
   const provider = getProvider(config);
   return provider.testConnection(buildOptions(config));
 }

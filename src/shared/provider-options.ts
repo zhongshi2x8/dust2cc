@@ -94,6 +94,15 @@ export const PROVIDERS: ProviderOption[] = [
     placeholder: '无需 API Key',
     helpUrl: 'https://ollama.com/',
   },
+  {
+    id: 'openai_compatible_custom',
+    name: 'OpenAI Compatible (自定义)',
+    summary: '适配 one-api、New API、中转站、自建网关或任何兼容 /chat/completions 的接口。',
+    setupLevel: 'advanced',
+    models: ['gpt-4o-mini', 'deepseek-chat', 'qwen-plus'],
+    placeholder: '可留空或填写你的 API Key',
+    helpUrl: 'https://platform.openai.com/docs/api-reference/chat/create',
+  },
 ];
 
 export function getProviderOption(providerId: LLMProviderType): ProviderOption | undefined {

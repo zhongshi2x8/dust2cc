@@ -118,6 +118,15 @@ export interface TradeSignal {
   target?: number;
 }
 
+export interface StructuredAIAnalysis {
+  trend: string;
+  confidence: number;
+  supportLevels: number[];
+  resistanceLevels: number[];
+  suggestion: string;
+  risks: string[];
+}
+
 export interface PageSnapshot {
   goodsInfo: GoodsInfo | null;
   price: PriceInfo | null;
@@ -135,7 +144,8 @@ export type LLMProviderType =
   | 'kimi_code'
   | 'glm'
   | 'gemini'
-  | 'ollama';
+  | 'ollama'
+  | 'openai_compatible_custom';
 
 export interface LLMConfig {
   provider: LLMProviderType;
@@ -166,7 +176,8 @@ export type MessageType =
   | 'LLM_STREAM_ERROR'
   | 'GET_SETTINGS'
   | 'SAVE_SETTINGS'
-  | 'TEST_CONNECTION';
+  | 'TEST_CONNECTION'
+  | 'TEST_LLM_CONNECTION';
 
 export interface ExtensionMessage {
   type: MessageType;

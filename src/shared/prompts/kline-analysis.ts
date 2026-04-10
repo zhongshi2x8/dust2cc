@@ -13,20 +13,20 @@ const SYSTEM_PROMPT = `你是一位专业的CS2饰品市场技术分析师。
 4. 始终提醒投资风险
 5. 用中文回答，简洁专业，避免啰嗦
 
-输出格式 (严格按此结构):
-## 趋势判断
-(一句话结论 + 依据)
+输出要求:
+1. 只输出 JSON，不要输出 Markdown、解释、前后缀或代码块
+2. 字段必须严格使用下面这些 key
+3. 如果某个字段没有把握，也要返回合理的空值，而不是省略字段
 
-## 关键价位
-- 支撑位: ¥xxx, ¥xxx
-- 阻力位: ¥xxx, ¥xxx
-
-## 交易建议
-(买入/卖出/观望) | 置信度: xx/100
-(一句话理由)
-
-## 风险提示
-(最关键的1-2条)`;
+JSON Schema:
+{
+  "trend": "一句话趋势判断",
+  "confidence": 0-100 的整数,
+  "supportLevels": [数字, 数字],
+  "resistanceLevels": [数字, 数字],
+  "suggestion": "一句话交易建议",
+  "risks": ["风险1", "风险2"]
+}`;
 
 export function buildKlineAnalysisPrompt(input: AnalysisInput): LLMMessage[] {
   const { goodsInfo, price, kline, indicators, patterns } = input;
@@ -69,7 +69,7 @@ ${patternsText}
 ## 近10期K线数据
 ${klineTable}
 
-请分析并给出交易建议。`;
+请基于以上数据输出严格 JSON。`;
 
   return [
     { role: 'system', content: SYSTEM_PROMPT },

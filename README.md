@@ -107,20 +107,6 @@ release/dist.zip
 4. 点击“加载已解压的扩展程序”
 5. 选择项目下的 `dist` 目录
 
-## 🚀 维护者发布
-
-如果你是仓库维护者，执行下面这条命令即可生成发布包：
-
-```bash
-npm run package
-```
-
-生成好的文件在：
-
-```bash
-release/dist.zip
-```
-
 ## 📄 License
 
 MIT

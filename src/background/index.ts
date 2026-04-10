@@ -4,7 +4,7 @@
 
 import { streamChat, testConnection } from './llm-router';
 import { getSettings, saveSettings } from '@shared/storage';
-import type { ExtensionMessage, LLMMessage } from '@shared/types';
+import type { ExtensionMessage, LLMConfig, LLMMessage } from '@shared/types';
 import { humanizeProviderError } from './error-messages';
 
 // ----- Message Handler -----
@@ -34,9 +34,20 @@ async function handleMessage(
       }
       case 'TEST_CONNECTION': {
         const settings = await getSettings();
-        const result = await testConnection();
+        const result = await testConnection(msg.data as Partial<LLMConfig> | undefined);
         if (!result.ok && result.error) {
-          result.error = humanizeProviderError(settings.llm.provider, result.error);
+          const provider = ((msg.data as Partial<LLMConfig> | undefined)?.provider || settings.llm.provider);
+          result.error = humanizeProviderError(provider, result.error);
+        }
+        sendResponse({ ok: true, data: result });
+        break;
+      }
+      case 'TEST_LLM_CONNECTION': {
+        const settings = await getSettings();
+        const result = await testConnection(msg.data as Partial<LLMConfig> | undefined);
+        if (!result.ok && result.error) {
+          const provider = ((msg.data as Partial<LLMConfig> | undefined)?.provider || settings.llm.provider);
+          result.error = humanizeProviderError(provider, result.error);
         }
         sendResponse({ ok: true, data: result });
         break;
