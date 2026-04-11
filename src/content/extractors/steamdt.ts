@@ -167,11 +167,15 @@ export class SteamdtExtractor implements SiteAdapter {
 
     if (domPrice && nuxtPrice) {
       if (!isPriceAlignedWithReference(nuxtPrice.current, domPrice.current, 0.2)) {
-        return nuxtPrice;
+        return {
+          current: domPrice.current,
+          currency: 'CNY',
+          changePercent24h: domPrice.changePercent24h ?? nuxtPrice.changePercent24h,
+        };
       }
 
       return {
-        current: nuxtPrice.current,
+        current: domPrice.current,
         currency: 'CNY',
         changePercent24h: nuxtPrice.changePercent24h ?? domPrice.changePercent24h,
       };
@@ -196,11 +200,11 @@ export class SteamdtExtractor implements SiteAdapter {
               { value: this.parseNumber(this.readNestedValue(source, 'lowIndex')), weight: 8 },
             ]
           : [
-              { value: this.parseNumber(this.readNestedValue(source, 'lowestPrice')), weight: 30 },
+              { value: this.parseNumber(this.readNestedValue(source, 'currentPrice')), weight: 30 },
               { value: this.parseNumber(this.readNestedValue(source, 'sellMinPrice')), weight: 24 },
-              { value: this.parseNumber(this.readNestedValue(source, 'currentPrice')), weight: 20 },
-              { value: this.parseNumber(this.readNestedValue(source, 'consignmentBest.price')), weight: 18 },
-              { value: this.parseNumber(this.readNestedValue(source, 'sellingPriceList.0.price')), weight: 14 },
+              { value: this.parseNumber(this.readNestedValue(source, 'consignmentBest.price')), weight: 22 },
+              { value: this.parseNumber(this.readNestedValue(source, 'sellingPriceList.0.price')), weight: 18 },
+              { value: this.parseNumber(this.readNestedValue(source, 'lowestPrice')), weight: 12 },
               { value: this.parseNumber(this.readNestedValue(source, 'purchaseBest.price')), weight: 10 },
               { value: this.parseNumber(this.readNestedValue(source, 'sellPrice')), weight: 8 },
               { value: this.parseNumber(this.readNestedValue(source, 'price')), weight: 4 },
@@ -358,8 +362,9 @@ export class SteamdtExtractor implements SiteAdapter {
       score += 36;
     }
     if (typeof record.itemId !== 'undefined' || typeof record.id !== 'undefined') score += 8;
-    if (typeof record.lowestPrice !== 'undefined') score += 28;
+    if (typeof record.currentPrice !== 'undefined') score += 30;
     if (typeof record.sellMinPrice !== 'undefined') score += 24;
+    if (typeof record.lowestPrice !== 'undefined') score += 12;
     if (typeof record.consignmentBest !== 'undefined') score += 18;
     if (Array.isArray(record.sellingPriceList)) score += 16;
     if (typeof record.purchaseBest !== 'undefined') score += 10;

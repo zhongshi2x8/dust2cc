@@ -99,7 +99,7 @@ export function pickPreferredObservedPrice<T extends PriceCandidate>(
 ): T | undefined {
   if (isFinitePositive(primary?.value) && isFinitePositive(fallback?.value)) {
     const deltaRatio = Math.abs(primary.value - fallback.value) / Math.max(primary.value, fallback.value);
-    if (deltaRatio >= 0.35) {
+    if (deltaRatio >= 0.35 && primary.value >= fallback.value) {
       return primary;
     }
   }
@@ -118,18 +118,26 @@ export function resolveBestAnalysisPrice(
   referencePrice?: number,
   observedPrice?: number,
 ): number {
+  if (
+    isFinitePositive(referencePrice) &&
+    !isPriceAlignedWithReference(currentPrice, referencePrice, 0.28) &&
+    !isPriceAlignedWithReference(observedPrice, referencePrice, 0.28)
+  ) {
+    return referencePrice;
+  }
+
   const candidates = [
     { value: observedPrice, weight: 18 },
     { value: currentPrice, weight: 14 },
     { value: referencePrice, weight: 12 },
   ];
 
-  const references = [observedPrice, referencePrice];
+  const references = [referencePrice, observedPrice];
   return (
     pickBestPriceCandidate(candidates, references)?.value ??
+    referencePrice ??
     observedPrice ??
     currentPrice ??
-    referencePrice ??
     0
   );
 }

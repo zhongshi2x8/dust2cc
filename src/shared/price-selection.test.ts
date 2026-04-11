@@ -44,6 +44,16 @@ describe('pickBestPriceCandidate', () => {
     expect(result?.value).toBe(459);
   });
 
+  it('does not blindly keep the primary price when it sharply disagrees with a trusted reference', () => {
+    const result = pickPreferredObservedPrice(
+      { value: 1280, weight: 0 },
+      { value: 35980, weight: 0 },
+      35989.5,
+    );
+
+    expect(result?.value).toBe(35980);
+  });
+
   it('can score against multiple trusted references and keep the closest valid price', () => {
     const result = pickBestPriceCandidate(
       [
@@ -88,6 +98,10 @@ describe('resolveBestAnalysisPrice', () => {
 
   it('keeps the current price when it is aligned with the reference close', () => {
     expect(resolveBestAnalysisPrice(35988, 35989.5)).toBe(35988);
+  });
+
+  it('prefers the reference close over a far-off observed price when both disagree', () => {
+    expect(resolveBestAnalysisPrice(1280, 35989.5, 1278)).toBe(35989.5);
   });
 });
 

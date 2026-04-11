@@ -848,10 +848,14 @@ function getReferenceClosePrice(): number | undefined {
 
 function resolveAnalysisPrice(priceInfo: PriceInfo | null): number {
   const referenceClose = getReferenceClosePrice();
-  const observedCurrent = safeExtractPrice()?.current;
   if (currentAdapter?.name === 'steamdt' && getSteamdtPageKind(window.location.href, document.title) === 'market-index') {
-    return referenceClose ?? observedCurrent ?? priceInfo?.current ?? 0;
+    return referenceClose ?? priceInfo?.current ?? safeExtractPrice()?.current ?? 0;
   }
+  if (currentAdapter?.name === 'steamdt') {
+    return resolveBestAnalysisPrice(priceInfo?.current, referenceClose);
+  }
+
+  const observedCurrent = safeExtractPrice()?.current;
   return resolveBestAnalysisPrice(priceInfo?.current, referenceClose, observedCurrent);
 }
 
@@ -1176,9 +1180,9 @@ function extractGoodsInfoFromPayload(raw: unknown): GoodsInfo | null {
 function extractPriceInfoFromPayload(raw: unknown): PriceInfo | null {
   const referenceClose = getReferenceClosePrice();
   const candidates = getCandidateRecords(raw).flatMap((payload) => [
-    { value: getNumber(payload, ['currentPrice']), weight: 20, payload },
+    { value: getNumber(payload, ['currentPrice']), weight: 24, payload },
     { value: getNumber(payload, ['sellMinPrice']), weight: 18, payload },
-    { value: getNumber(payload, ['lowestPrice']), weight: 16, payload },
+    { value: getNumber(payload, ['lowestPrice']), weight: 8, payload },
     { value: getNumber(payload, ['last_price']), weight: 14, payload },
     { value: getNumber(payload, ['steam_price']), weight: 12, payload },
     { value: getNumber(payload, ['buff_price']), weight: 10, payload },

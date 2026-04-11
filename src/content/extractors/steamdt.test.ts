@@ -134,7 +134,7 @@ describe('steamdtExtractor.extractPrice', () => {
     });
   });
 
-  it('prefers the current item hydration price when the DOM price is from a wrong card', () => {
+  it('keeps the visible hero price when hydration only exposes a far lower lowestPrice', () => {
     document.body.innerHTML = `
       <main>
         <section class="detail-summary">
@@ -154,7 +154,24 @@ describe('steamdtExtractor.extractPrice', () => {
     mockRect(document.querySelector('.price-main'), { top: 145, left: 140, width: 180, height: 54 });
 
     expect(steamdtExtractor.extractPrice()).toEqual({
-      current: 226,
+      current: 1280,
+      currency: 'CNY',
+      changePercent24h: -1.27,
+    });
+  });
+
+  it('prefers currentPrice over lowestPrice from hydration when both exist', () => {
+    document.body.innerHTML = `
+      <div class="detail-header">
+        <h1>AK-47 | 红线 (久经沙场)</h1>
+      </div>
+      <script id="__NUXT_DATA__" type="application/json">
+        [{"data":{"detail":{"itemId":"22499","marketHashName":"AK-47 | Redline (Field-Tested)","name":"AK-47 | 红线 (久经沙场)","currentPrice":1280,"lowestPrice":226,"sellMinPrice":1278,"diff1Day":-1.27}}}]
+      </script>
+    `;
+
+    expect(steamdtExtractor.extractPrice()).toEqual({
+      current: 1280,
       currency: 'CNY',
       changePercent24h: -1.27,
     });
