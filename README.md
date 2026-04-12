@@ -22,11 +22,23 @@
 
 ## 📦 使用教程
 
-直接下载：
+推荐直接通过 Chrome 应用商店安装：
+
+- [Chrome 应用商店安装 dust2.cc](https://chromewebstore.google.com/detail/dust2cc/fmobanaidahkchcfjediocelejidkajb?hl=zh-CN&utm_source=ext_sidebar)
+
+商店安装步骤：
+
+1. 点击上面的 Chrome 应用商店链接
+2. 进入 `dust2.cc` 插件页面
+3. 点击“添加至 Chrome”
+4. 按提示确认安装
+5. 安装完成后，在 Chrome 工具栏或侧边栏中打开插件即可使用
+
+如果你想手动安装最新发布包，也可以使用下面的方式：
 
 - [点击下载 dist.zip](https://github.com/zhongshi2x8/dust2cc/releases/latest/download/dist.zip)
 
-安装步骤：
+手动安装步骤：
 
 1. 点击上面的 `dist.zip` 下载链接
 2. 解压 `dist.zip`
