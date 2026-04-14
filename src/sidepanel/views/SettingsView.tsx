@@ -1,7 +1,8 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { validateLLMConfig } from '@shared/llm-config';
 import { PROVIDERS, getProviderOption } from '@shared/provider-options';
-import type { AnalysisStyle, AnalysisPeriodMode, KlinePeriod, LLMConfig, UserSettings } from '@shared/types';
+import { getPeriodModeLabel, getAnalysisStyleLabel } from '@shared/constants';
+import type { KlinePeriod, LLMConfig, UserSettings } from '@shared/types';
 
 interface RuntimeResponse<T> {
   ok: boolean;
@@ -572,19 +573,3 @@ export function SettingsView() {
   );
 }
 
-function getPeriodModeLabel(mode: AnalysisPeriodMode): string {
-  return mode === 'multi' ? '多周期联动分析' : '单周期分析';
-}
-
-function getAnalysisStyleLabel(style: AnalysisStyle): string {
-  switch (style) {
-    case 'conservative':
-      return '保守风格';
-    case 'aggressive':
-      return '激进风格';
-    case 'objective':
-      return '客观风格';
-    default:
-      return '平衡风格';
-  }
-}

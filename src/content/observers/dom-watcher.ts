@@ -16,6 +16,7 @@ export class DOMWatcher {
   private lastUrl: string;
   private debounceTimer: ReturnType<typeof setTimeout> | null = null;
   private started = false;
+  private popstateHandler: (() => void) | null = null;
 
   constructor(onContentReady: Callback, onNavigation: Callback) {
     this.onContentReady = onContentReady;
@@ -60,15 +61,24 @@ export class DOMWatcher {
     });
 
     // Also listen for popstate (back/forward navigation)
-    window.addEventListener('popstate', () => {
+    this.popstateHandler = () => {
       this.lastUrl = window.location.href;
       this.onNavigation();
-    });
+    };
+    window.addEventListener('popstate', this.popstateHandler);
   }
 
   stop() {
     this.observer?.disconnect();
     this.observer = null;
+    if (this.popstateHandler) {
+      window.removeEventListener('popstate', this.popstateHandler);
+      this.popstateHandler = null;
+    }
+    if (this.debounceTimer) {
+      clearTimeout(this.debounceTimer);
+      this.debounceTimer = null;
+    }
     this.started = false;
   }
 

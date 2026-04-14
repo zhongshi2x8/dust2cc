@@ -1,7 +1,8 @@
 import React, { useEffect, useState } from 'react';
 import ReactMarkdown from 'react-markdown';
 import { clearAnalysisHistory, getAnalysisHistory } from '@shared/storage';
-import type { AnalysisHistoryEntry, AnalysisPeriodMode, AnalysisStyle } from '@shared/types';
+import { getPeriodModeLabel, getPeriodModeShortLabel, getAnalysisStyleLabel, getSignalLabel } from '@shared/constants';
+import type { AnalysisHistoryEntry } from '@shared/types';
 
 export function HistoryView() {
   const [history, setHistory] = useState<AnalysisHistoryEntry[]>([]);
@@ -102,7 +103,7 @@ export function HistoryView() {
               <div className="structured-ai-grid">
                 <div className="structured-ai-block">
                   <span className="structured-ai-label">分析风格</span>
-                  <strong>{getStyleLabel(selectedEntry.analysisStyle)}</strong>
+                  <strong>{getAnalysisStyleLabel(selectedEntry.analysisStyle)}</strong>
                 </div>
                 <div className="structured-ai-block">
                   <span className="structured-ai-label">本地信号</span>
@@ -171,34 +172,3 @@ function formatHistoryMeta(entry: AnalysisHistoryEntry): string {
   ].join(' | ');
 }
 
-function getPeriodModeLabel(mode: AnalysisPeriodMode): string {
-  return mode === 'multi' ? '多周期联动分析' : '单周期分析';
-}
-
-function getPeriodModeShortLabel(mode: AnalysisPeriodMode): string {
-  return mode === 'multi' ? '多周期' : '单周期';
-}
-
-function getStyleLabel(style: AnalysisStyle): string {
-  switch (style) {
-    case 'conservative':
-      return '保守风格';
-    case 'aggressive':
-      return '激进风格';
-    case 'objective':
-      return '客观风格';
-    default:
-      return '平衡风格';
-  }
-}
-
-function getSignalLabel(action: AnalysisHistoryEntry['localSignal']['action']): string {
-  switch (action) {
-    case 'buy':
-      return '买入';
-    case 'sell':
-      return '卖出';
-    default:
-      return '观望';
-  }
-}

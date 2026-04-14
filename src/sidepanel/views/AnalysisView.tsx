@@ -10,16 +10,54 @@ import { buildKlineAnalysisPrompt } from '@shared/prompts/kline-analysis';
 import { generateQuickSignal } from '@shared/prompts/trade-signal';
 import { pickBestPriceCandidate } from '@shared/price-selection';
 import { getSettings, saveAnalysisHistoryEntry, saveSettings } from '@shared/storage';
+import { getPeriodModeLabel, getAnalysisStyleLabel, getSignalLabel } from '@shared/constants';
 import type {
   AnalysisPeriodMode,
   AnalysisStyle,
   KlinePeriod,
+  LLMConfig,
+  LLMMessage,
   PageSnapshot,
   StructuredAIAnalysis,
   TimeframeAnalysisInput,
   TradeSignal,
 } from '@shared/types';
 import { requestActivePageState } from '../page-data';
+
+interface StreamLLMOptions {
+  messages: LLMMessage[];
+  configOverride?: Partial<LLMConfig>;
+  onChunk: (accumulatedText: string, partialParsed: StructuredAIAnalysis | null) => void;
+  onDone: (parsed: StructuredAIAnalysis | null, rawText: string) => void;
+  onError: (error: string) => void;
+}
+
+function streamLLM({ messages, configOverride, onChunk, onDone, onError }: StreamLLMOptions) {
+  try {
+    const port = chrome.runtime.connect({ name: 'llm-stream' });
+    let fullText = '';
+    let chunkCount = 0;
+
+    port.onMessage.addListener((msg: { type: string; text?: string; error?: string }) => {
+      if (msg.type === 'chunk') {
+        fullText += msg.text;
+        chunkCount++;
+        // Try incremental parsing every 5 chunks (avoid parsing every single chunk)
+        const partialParsed = chunkCount % 5 === 0 ? parseStructuredAIAnalysis(fullText) : null;
+        onChunk(fullText, partialParsed);
+      } else if (msg.type === 'done') {
+        const parsed = parseStructuredAIAnalysis(fullText);
+        onDone(parsed, fullText);
+      } else if (msg.type === 'error') {
+        onError(msg.error || '未知错误');
+      }
+    });
+
+    port.postMessage({ messages, ...(configOverride ? { configOverride } : {}) });
+  } catch (e) {
+    onError(e instanceof Error ? e.message : '分析失败');
+  }
+}
 
 export function AnalysisView() {
   const [pageData, setPageData] = useState<PageSnapshot | null>(null);
@@ -202,76 +240,45 @@ export function AnalysisView() {
 
     setStreaming(true);
 
-    try {
-      const port = chrome.runtime.connect({ name: 'llm-stream' });
-      let fullText = '';
+    const historyBase = {
+      localSignal,
+      localSummary,
+      currentPrice,
+      period: selectedPeriod,
+      primaryPeriod,
+      activePeriods,
+      style: settings.analysis.aiStyle,
+    };
 
-      port.onMessage.addListener((msg) => {
-        if (msg.type === 'chunk') {
-          fullText += msg.text;
-          setAiText(fullText);
-        } else if (msg.type === 'done') {
-          const parsed = parseStructuredAIAnalysis(fullText);
-          setStructuredAI(parsed);
-          setAiText(parsed ? '' : fullText);
-          void persistHistory({
-            localSignal,
-            localSummary,
-            currentPrice,
-            period: selectedPeriod,
-            primaryPeriod,
-            activePeriods,
-            style: settings.analysis.aiStyle,
-            analysis: parsed,
-            fallbackText: parsed ? '' : fullText,
-          });
-          setStreaming(false);
-        } else if (msg.type === 'error') {
-          setError(msg.error);
-          void persistHistory({
-            localSignal,
-            localSummary,
-            currentPrice,
-            period: selectedPeriod,
-            primaryPeriod,
-            activePeriods,
-            style: settings.analysis.aiStyle,
-            analysis: null,
-            fallbackText: '',
-          });
-          setStreaming(false);
-        }
-      });
-
-      port.postMessage({
-        messages: buildKlineAnalysisPrompt({
-          goodsInfo: pageData.goodsInfo || { id: '', name: '未知饰品', source: 'csqaq' },
-          price: { current: currentPrice, currency: 'CNY' },
-          kline: primaryInput.kline,
-          period: selectedPeriod,
-          primaryPeriod,
-          periodMode,
-          style: settings.analysis.aiStyle,
-          timeframes: timeframeInputs,
-          indicators,
-          patterns,
-        }),
-      });
-    } catch (e) {
-      setError(e instanceof Error ? e.message : '分析失败');
-      await persistHistory({
-        localSignal,
-        localSummary,
-        currentPrice,
+    streamLLM({
+      messages: buildKlineAnalysisPrompt({
+        goodsInfo: pageData.goodsInfo || { id: '', name: '未知饰品', source: 'csqaq' },
+        price: { current: currentPrice, currency: 'CNY' },
+        kline: primaryInput.kline,
         period: selectedPeriod,
         primaryPeriod,
-        activePeriods,
+        periodMode,
         style: settings.analysis.aiStyle,
-        analysis: null,
-        fallbackText: '',
-      });
-      setStreaming(false);
-    }
+        timeframes: timeframeInputs,
+        indicators,
+        patterns,
+      }),
+      onChunk: (text, partialParsed) => {
+        setAiText(text);
+        if (partialParsed) setStructuredAI(partialParsed);
+      },
+      onDone: (parsed, rawText) => {
+        setStructuredAI(parsed);
+        setAiText(parsed ? '' : rawText);
+        void persistHistory({ ...historyBase, analysis: parsed, fallbackText: parsed ? '' : rawText });
+        setStreaming(false);
+      },
+      onError: (errorMsg) => {
+        setError(errorMsg);
+        void persistHistory({ ...historyBase, analysis: null, fallbackText: '' });
+        setStreaming(false);
+      },
+    });
   }
 
   async function runCompareAnalysis() {
@@ -319,44 +326,34 @@ export function AnalysisView() {
     setCompareError('');
     setCompareModelLabel(`${settings.comparison.llm.provider} / ${settings.comparison.llm.model}`);
 
-    try {
-      const port = chrome.runtime.connect({ name: 'llm-stream' });
-      let fullText = '';
-
-      port.onMessage.addListener((msg) => {
-        if (msg.type === 'chunk') {
-          fullText += msg.text;
-          setCompareAIText(fullText);
-        } else if (msg.type === 'done') {
-          const parsed = parseStructuredAIAnalysis(fullText);
-          setCompareStructuredAI(parsed);
-          setCompareAIText(parsed ? '' : fullText);
-          setCompareStreaming(false);
-        } else if (msg.type === 'error') {
-          setCompareError(msg.error);
-          setCompareStreaming(false);
-        }
-      });
-
-      port.postMessage({
-        configOverride: settings.comparison.llm,
-        messages: buildKlineAnalysisPrompt({
-          goodsInfo: pageData.goodsInfo || { id: '', name: '未知饰品', source: 'csqaq' },
-          price: { current: currentPrice, currency: 'CNY' },
-          kline: primaryInput.kline,
-          period: selectedPeriod,
-          primaryPeriod,
-          periodMode,
-          style: settings.analysis.aiStyle,
-          timeframes: timeframeInputs,
-          indicators: primaryInput.indicators,
-          patterns: primaryInput.patterns,
-        }),
-      });
-    } catch (e) {
-      setCompareError(e instanceof Error ? e.message : '对比分析失败');
-      setCompareStreaming(false);
-    }
+    streamLLM({
+      configOverride: settings.comparison.llm,
+      messages: buildKlineAnalysisPrompt({
+        goodsInfo: pageData.goodsInfo || { id: '', name: '未知饰品', source: 'csqaq' },
+        price: { current: currentPrice, currency: 'CNY' },
+        kline: primaryInput.kline,
+        period: selectedPeriod,
+        primaryPeriod,
+        periodMode,
+        style: settings.analysis.aiStyle,
+        timeframes: timeframeInputs,
+        indicators: primaryInput.indicators,
+        patterns: primaryInput.patterns,
+      }),
+      onChunk: (text, partialParsed) => {
+        setCompareAIText(text);
+        if (partialParsed) setCompareStructuredAI(partialParsed);
+      },
+      onDone: (parsed, rawText) => {
+        setCompareStructuredAI(parsed);
+        setCompareAIText(parsed ? '' : rawText);
+        setCompareStreaming(false);
+      },
+      onError: (errorMsg) => {
+        setCompareError(errorMsg);
+        setCompareStreaming(false);
+      },
+    });
   }
 
   async function persistHistory({
@@ -577,24 +574,21 @@ export function AnalysisView() {
             subtitle={mainModelLabel || '未配置模型'}
             collapsed={mainSectionCollapsed}
             onToggle={() => setMainSectionCollapsed((current) => !current)}
-            badge={streaming ? '分析中' : effectiveStructuredAI ? '已完成' : aiText ? '原始文本' : undefined}
+            badge={streaming ? '生成中...' : effectiveStructuredAI ? '已完成' : aiText ? '原始文本' : undefined}
           >
             <div className="model-analysis-section">
+              {streaming && !effectiveStructuredAI && (
+                <StreamingSkeleton text={aiText} />
+              )}
+
               {effectiveStructuredAI ? (
-                <StructuredAISection analysis={effectiveStructuredAI} />
+                <>
+                  <StructuredAISection analysis={effectiveStructuredAI} />
+                  {streaming && <div className="streaming-hint">模型仍在生成，卡片内容会实时更新...</div>}
+                </>
               ) : (
-                aiText && (
-                  <CollapsibleSection
-                    title="原始模型输出"
-                    subtitle="当前还没能稳定解析成卡片，你也可以展开查看原文。"
-                    collapsed={rawOutputCollapsed}
-                    onToggle={() => setRawOutputCollapsed((current) => !current)}
-                    badge="原始文本"
-                  >
-                    <div className="analysis-content markdown-body">
-                      <ReactMarkdown>{aiText}</ReactMarkdown>
-                    </div>
-                  </CollapsibleSection>
+                !streaming && aiText && (
+                  <FallbackAnalysisCard text={aiText} />
                 )
               )}
 
@@ -624,24 +618,18 @@ export function AnalysisView() {
                 </div>
               )}
 
+              {compareStreaming && !compareStructuredAI && (
+                <StreamingSkeleton text={compareAIText} />
+              )}
+
               {compareStructuredAI ? (
-                <StructuredAISection analysis={compareStructuredAI} />
+                <>
+                  <StructuredAISection analysis={compareStructuredAI} />
+                  {compareStreaming && <div className="streaming-hint">对比模型仍在生成...</div>}
+                </>
               ) : (
-                compareAIText && (
-                  <>
-                    <div className="info-note">对比模型未返回结构化 JSON，以下为原始文本。</div>
-                    <CollapsibleSection
-                      title="对比模型原始输出"
-                      subtitle="当前只保留原文，避免直接把整屏内容铺开。"
-                      collapsed={compareRawOutputCollapsed}
-                      onToggle={() => setCompareRawOutputCollapsed((current) => !current)}
-                      badge="原始文本"
-                    >
-                      <div className="analysis-content markdown-body">
-                        <ReactMarkdown>{compareAIText}</ReactMarkdown>
-                      </div>
-                    </CollapsibleSection>
-                  </>
+                !compareStreaming && compareAIText && (
+                  <FallbackAnalysisCard text={compareAIText} />
                 )
               )}
             </div>
@@ -700,6 +688,138 @@ function CollapsibleSection({
         </div>
       </button>
       {!collapsed ? children : null}
+    </div>
+  );
+}
+
+/** Animated skeleton shown while streaming, before structured parse succeeds */
+function StreamingSkeleton({ text }: { text: string }) {
+  const charCount = text.length;
+  const hasJson = text.includes('{');
+  return (
+    <div className="streaming-skeleton">
+      <div className="streaming-skeleton-header">
+        <div className="streaming-dot" />
+        <span>AI 正在生成分析{hasJson ? '，正在解析结构...' : `（已接收 ${charCount} 字符）`}</span>
+      </div>
+      <div className="streaming-skeleton-bars">
+        <div className="skeleton-bar" style={{ width: '80%' }} />
+        <div className="skeleton-bar" style={{ width: '60%' }} />
+        <div className="skeleton-bar" style={{ width: '70%' }} />
+        <div className="skeleton-bar short" style={{ width: '40%' }} />
+      </div>
+    </div>
+  );
+}
+
+/**
+ * Smart fallback card: when JSON parsing completely fails, still extract
+ * useful info from the raw text and present it in a readable card format
+ * instead of dumping raw markdown.
+ */
+function FallbackAnalysisCard({ text }: { text: string }) {
+  const [rawExpanded, setRawExpanded] = useState(false);
+  const lines = text.split('\n').map((l) => l.trim()).filter(Boolean);
+
+  // Try to extract key info from raw text
+  const trendMatch = text.match(/趋势[：:]\s*(.+)/);
+  const suggestionMatch = text.match(/建议[：:]\s*(.+)/);
+  const confidenceMatch = text.match(/置信度[：:]\s*(\d+)/);
+  const supportMatch = text.match(/支撑[位价][：:]\s*([\d.,¥ \/]+)/);
+  const resistanceMatch = text.match(/[压阻][力力][位价][：:]\s*([\d.,¥ \/]+)/);
+
+  const hasExtractedInfo = trendMatch || suggestionMatch || confidenceMatch;
+
+  // Extract bullet points (lines starting with - or number)
+  const bulletPoints = lines
+    .filter((l) => /^[-•·\d]/.test(l))
+    .map((l) => l.replace(/^[-•·\d.、)\s]+/, '').trim())
+    .filter((l) => l.length > 4)
+    .slice(0, 8);
+
+  // Get the first meaningful paragraph as summary
+  const summaryLine = lines.find((l) => l.length > 10 && !l.startsWith('#') && !/^[-•·\d{]/.test(l)) || '';
+
+  return (
+    <div className="fallback-analysis-card">
+      <div className="fallback-card-header">
+        <span className="fallback-badge">AI 分析结果</span>
+        <span className="subtle-note">未能解析为标准卡片，已智能提取关键信息</span>
+      </div>
+
+      {(hasExtractedInfo || summaryLine) && (
+        <div className="structured-ai-card">
+          {summaryLine && (
+            <div className="structured-ai-block">
+              <span className="structured-ai-label">核心结论</span>
+              <strong>{summaryLine}</strong>
+            </div>
+          )}
+
+          {(trendMatch || confidenceMatch) && (
+            <div className="structured-ai-grid">
+              {trendMatch && (
+                <div className="structured-ai-block">
+                  <span className="structured-ai-label">趋势</span>
+                  <strong>{trendMatch[1].trim()}</strong>
+                </div>
+              )}
+              {confidenceMatch && (
+                <div className="structured-ai-block">
+                  <span className="structured-ai-label">置信度</span>
+                  <strong>{confidenceMatch[1]}%</strong>
+                </div>
+              )}
+            </div>
+          )}
+
+          {(supportMatch || resistanceMatch) && (
+            <div className="structured-ai-grid">
+              {supportMatch && (
+                <div className="structured-ai-block">
+                  <span className="structured-ai-label">支撑位</span>
+                  <strong>{supportMatch[1].trim()}</strong>
+                </div>
+              )}
+              {resistanceMatch && (
+                <div className="structured-ai-block">
+                  <span className="structured-ai-label">压力位</span>
+                  <strong>{resistanceMatch[1].trim()}</strong>
+                </div>
+              )}
+            </div>
+          )}
+
+          {suggestionMatch && (
+            <div className="structured-ai-block">
+              <span className="structured-ai-label">建议</span>
+              <strong>{suggestionMatch[1].trim()}</strong>
+            </div>
+          )}
+
+          {bulletPoints.length > 0 && (
+            <div className="structured-ai-block">
+              <span className="structured-ai-label">要点</span>
+              <ul className="structured-ai-risks">
+                {bulletPoints.map((point) => (
+                  <li key={point}>{point}</li>
+                ))}
+              </ul>
+            </div>
+          )}
+        </div>
+      )}
+
+      <CollapsibleSection
+        title="查看原始输出"
+        subtitle="展开可查看模型的完整原始回复"
+        collapsed={!rawExpanded}
+        onToggle={() => setRawExpanded((v) => !v)}
+      >
+        <div className="analysis-content markdown-body">
+          <ReactMarkdown>{text}</ReactMarkdown>
+        </div>
+      </CollapsibleSection>
     </div>
   );
 }
@@ -986,30 +1106,3 @@ function buildTimeframeInput(period: KlinePeriod, currentPrice: number, kline: P
   };
 }
 
-function getSignalLabel(action: TradeSignal['action']): string {
-  switch (action) {
-    case 'buy':
-      return '买入';
-    case 'sell':
-      return '卖出';
-    default:
-      return '观望';
-  }
-}
-
-function getPeriodModeLabel(mode: AnalysisPeriodMode): string {
-  return mode === 'multi' ? '多周期联动分析' : '单周期分析';
-}
-
-function getAnalysisStyleLabel(style: AnalysisStyle): string {
-  switch (style) {
-    case 'conservative':
-      return '保守风格';
-    case 'aggressive':
-      return '激进风格';
-    case 'objective':
-      return '客观风格';
-    default:
-      return '平衡风格';
-  }
-}

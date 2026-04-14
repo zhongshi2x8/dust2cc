@@ -903,3 +903,96 @@ body.extension-popup .app {
   color: #9aa3d6;
   font-size: 12px;
 }
+
+/* ---- Streaming Skeleton ---- */
+
+.streaming-skeleton {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding: 16px;
+  border-radius: 12px;
+  border: 1px solid #333a60;
+  background: #202445;
+}
+
+.streaming-skeleton-header {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  color: #c7d2fe;
+  font-size: 13px;
+}
+
+.streaming-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: #7f8cff;
+  animation: pulse 1.2s ease-in-out infinite;
+}
+
+@keyframes pulse {
+  0%, 100% { opacity: 0.4; transform: scale(0.9); }
+  50% { opacity: 1; transform: scale(1.1); }
+}
+
+.streaming-skeleton-bars {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.skeleton-bar {
+  height: 12px;
+  border-radius: 6px;
+  background: linear-gradient(90deg, rgba(127, 140, 255, 0.08) 25%, rgba(127, 140, 255, 0.18) 50%, rgba(127, 140, 255, 0.08) 75%);
+  background-size: 200% 100%;
+  animation: shimmer 1.5s ease-in-out infinite;
+}
+
+.skeleton-bar.short {
+  height: 10px;
+}
+
+@keyframes shimmer {
+  0% { background-position: -200% 0; }
+  100% { background-position: 200% 0; }
+}
+
+.streaming-hint {
+  padding: 8px 12px;
+  border-radius: 8px;
+  background: rgba(127, 140, 255, 0.08);
+  color: #9aa3d6;
+  font-size: 12px;
+  text-align: center;
+  animation: pulse 2s ease-in-out infinite;
+}
+
+/* ---- Fallback Analysis Card ---- */
+
+.fallback-analysis-card {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.fallback-card-header {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.fallback-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 10px;
+  border-radius: 999px;
+  background: rgba(255, 193, 7, 0.12);
+  border: 1px solid rgba(255, 193, 7, 0.25);
+  color: #ffd54f;
+  font-size: 12px;
+  width: fit-content;
+}

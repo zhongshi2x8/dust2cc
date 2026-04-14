@@ -53,30 +53,37 @@ export function parseStructuredAIAnalysis(rawText: string): StructuredAIAnalysis
   const trimmed = rawText.trim();
   if (!trimmed) return null;
 
-  const fenceMatch = trimmed.match(/```(?:json)?\s*([\s\S]*?)```/i);
-  const objectMatch = extractBalancedObject(trimmed);
+  // Strip common model thinking wrappers before attempting parse
+  const stripped = stripThinkingWrappers(trimmed);
+
+  const fenceMatch = stripped.match(/```(?:json)?\s*([\s\S]*?)```/i);
+  const objectMatch = extractBalancedObject(stripped);
+  // Also try extracting from original text in case stripping was too aggressive
+  const objectMatchOriginal = objectMatch ? null : extractBalancedObject(trimmed);
   const candidates = [
-    trimmed,
+    stripped,
     fenceMatch?.[1]?.trim(),
     objectMatch?.trim(),
-    trimmed.replace(/\\"/g, '"').replace(/\\n/g, '\n').trim(),
+    objectMatchOriginal?.trim(),
+    stripped.replace(/\\"/g, '"').replace(/\\n/g, '\n').trim(),
+    trimmed,
   ].filter((candidate): candidate is string => Boolean(candidate));
 
   for (const candidate of candidates) {
     const parsed = tryParseJson(candidate);
     if (!parsed) continue;
 
-    const summary = pickValue(parsed, ['summary', '核心结论', '结论']);
-    const trend = pickValue(parsed, ['trend', '趋势', 'direction']);
-    const confidence = pickValue(parsed, ['confidence', '置信度']);
-    const reasoning = pickValue(parsed, ['reasoning', '依据', 'reasons', '推理依据']);
-    const signals = pickValue(parsed, ['signals', '信号', 'technicalSignals']);
-    const timeframeBias = pickValue(parsed, ['timeframeBias', '周期倾向', '多周期倾向']);
-    const primaryTimeframe = pickValue(parsed, ['primaryTimeframe', '主周期', '主分析周期']);
-    const supportLevels = pickValue(parsed, ['supportLevels', 'supports', 'support', '支撑位']);
-    const resistanceLevels = pickValue(parsed, ['resistanceLevels', 'resistances', 'resistance', '压力位']);
-    const suggestion = pickValue(parsed, ['suggestion', '建议', 'recommendation']);
-    const risks = pickValue(parsed, ['risks', 'riskWarnings', '风险提示']);
+    const summary = pickValue(parsed, ['summary', '核心结论', '结论', '总结', 'conclusion', 'analysis_summary']);
+    const trend = pickValue(parsed, ['trend', '趋势', 'direction', '趋势判断', 'trend_direction']);
+    const confidence = pickValue(parsed, ['confidence', '置信度', '确信度', 'confidence_score']);
+    const reasoning = pickValue(parsed, ['reasoning', '依据', 'reasons', '推理依据', '分析依据', '推理', 'analysis_reasoning']);
+    const signals = pickValue(parsed, ['signals', '信号', 'technicalSignals', '技术信号', 'technical_signals']);
+    const timeframeBias = pickValue(parsed, ['timeframeBias', '周期倾向', '多周期倾向', 'timeframe_bias']);
+    const primaryTimeframe = pickValue(parsed, ['primaryTimeframe', '主周期', '主分析周期', 'primary_timeframe']);
+    const supportLevels = pickValue(parsed, ['supportLevels', 'supports', 'support', '支撑位', 'support_levels']);
+    const resistanceLevels = pickValue(parsed, ['resistanceLevels', 'resistances', 'resistance', '压力位', '阻力位', 'resistance_levels']);
+    const suggestion = pickValue(parsed, ['suggestion', '建议', 'recommendation', '交易建议', 'advice']);
+    const risks = pickValue(parsed, ['risks', 'riskWarnings', '风险提示', '风险', 'risk_warnings']);
 
     const normalized: StructuredAIAnalysis = {
       summary: typeof summary === 'string' ? summary.trim() : '',
@@ -125,12 +132,37 @@ function normalizeTimeframeBias(value: unknown): Record<string, string> | undefi
   return Object.fromEntries(entries);
 }
 
+/** Strip thinking/reasoning wrappers that models prepend to their output. */
+function stripThinkingWrappers(text: string): string {
+  let result = text;
+
+  // Strip XML-style thinking tags
+  const thinkTagPattern = /<(?:think|thinking|reasoning|thought)>[\s\S]*?<\/(?:think|thinking|reasoning|thought)>/gi;
+  result = result.replace(thinkTagPattern, '');
+
+  // Strip short preamble text before the first {
+  result = result.replace(/^[\s\S]*?(?=\{)/m, (match) => {
+    if (match.length > 500) return match;
+    return '';
+  });
+
+  // Try to extract just the balanced JSON object
+  const balanced = extractBalancedObject(result);
+  if (balanced) {
+    return balanced;
+  }
+
+  return result.trim();
+}
+
 function sanitizeJsonCandidate(candidate: string): string {
   return candidate
     .trim()
-    .replace(/[“”]/g, '"')
-    .replace(/[‘’]/g, "'")
-    .replace(/,\s*([}\]])/g, '$1');
+    .replace(/[\u201c\u201d]/g, '"')
+    .replace(/[\u2018\u2019]/g, "'")
+    .replace(/,\s*([}\]])/g, '$1')
+    .replace(/([{,]\s*)([a-zA-Z_]\w*)\s*:/g, '$1"$2":')
+    .replace(/'([^']*?)'/g, '"$1"');
 }
 
 function extractBalancedObject(text: string): string | null {
@@ -173,16 +205,16 @@ function extractBalancedObject(text: string): string | null {
 }
 
 function parseLabeledText(text: string): StructuredAIAnalysis | null {
-  const summary = extractLabeledValue(text, ['summary', '核心结论', '结论']);
-  const trend = extractLabeledValue(text, ['trend', '趋势']);
-  const confidenceText = extractLabeledValue(text, ['confidence', '置信度']);
-  const suggestion = extractLabeledValue(text, ['suggestion', '建议']);
+  const summary = extractLabeledValue(text, ['summary', '核心结论', '结论', '总结']);
+  const trend = extractLabeledValue(text, ['trend', '趋势', '趋势判断']);
+  const confidenceText = extractLabeledValue(text, ['confidence', '置信度', '确信度']);
+  const suggestion = extractLabeledValue(text, ['suggestion', '建议', '交易建议']);
   const primaryTimeframe = extractLabeledValue(text, ['primaryTimeframe', '主周期', '主分析周期']);
-  const reasoning = extractBulletBlock(text, ['reasoning', '推理依据', '依据']);
-  const signals = extractBulletBlock(text, ['signals', '信号']);
-  const risks = extractBulletBlock(text, ['risks', '风险提示']);
+  const reasoning = extractBulletBlock(text, ['reasoning', '推理依据', '依据', '分析依据']);
+  const signals = extractBulletBlock(text, ['signals', '信号', '技术信号']);
+  const risks = extractBulletBlock(text, ['risks', '风险提示', '风险']);
   const supportLevels = extractNumberList(extractLabeledValue(text, ['supportLevels', '支撑位']));
-  const resistanceLevels = extractNumberList(extractLabeledValue(text, ['resistanceLevels', '压力位']));
+  const resistanceLevels = extractNumberList(extractLabeledValue(text, ['resistanceLevels', '压力位', '阻力位']));
   const timeframeBias = extractTimeframeBias(text);
   const normalized: StructuredAIAnalysis = {
     summary,

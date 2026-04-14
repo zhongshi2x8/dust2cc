@@ -63,13 +63,20 @@ async function handleTestConnectionMessage(
 chrome.runtime.onConnect.addListener((port) => {
   if (port.name !== 'llm-stream') return;
 
+  let disconnected = false;
+  port.onDisconnect.addListener(() => {
+    disconnected = true;
+  });
+
   port.onMessage.addListener(async (msg: { messages: LLMMessage[]; configOverride?: Partial<LLMConfig> }) => {
     try {
       for await (const chunk of streamChat(msg.messages, msg.configOverride)) {
+        if (disconnected) break;
         port.postMessage({ type: 'chunk', text: chunk });
       }
-      port.postMessage({ type: 'done' });
+      if (!disconnected) port.postMessage({ type: 'done' });
     } catch (e) {
+      if (disconnected) return;
       const settings = await getSettings();
       const provider = msg.configOverride?.provider || settings.llm.provider;
       port.postMessage({

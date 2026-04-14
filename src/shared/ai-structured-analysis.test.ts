@@ -146,6 +146,31 @@ describe('parseStructuredAIAnalysis', () => {
     });
   });
 
+  it('parses json wrapped in <think> tags (DeepSeek-R1 style)', () => {
+    const result = parseStructuredAIAnalysis([
+      '<think>',
+      '让我分析一下这个饰品的K线数据...',
+      '从MA来看价格站上了MA20...',
+      '</think>',
+      '{"summary":"价格站上均线偏强","trend":"震荡偏强","confidence":70,"reasoning":["MA多头排列"],"signals":["金叉"],"supportLevels":[180],"resistanceLevels":[200],"suggestion":"回踩可关注","risks":["量能不足"]}',
+    ].join('\n'));
+
+    expect(result).not.toBeNull();
+    expect(result!.summary).toBe('价格站上均线偏强');
+    expect(result!.trend).toBe('震荡偏强');
+    expect(result!.confidence).toBe(70);
+  });
+
+  it('parses json with unquoted keys', () => {
+    const result = parseStructuredAIAnalysis(
+      '{ summary: "测试结论", trend: "偏多", confidence: 65, suggestion: "持有观望" }',
+    );
+
+    expect(result).not.toBeNull();
+    expect(result!.summary).toBe('测试结论');
+    expect(result!.trend).toBe('偏多');
+  });
+
   it('parses json with trailing commas and extra wrapper text', () => {
     const result = parseStructuredAIAnalysis([
       '以下是分析结果：',
