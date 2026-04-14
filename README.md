@@ -55,49 +55,7 @@
 - Chrome Extension Manifest V3
 - Vitest
 
-## 🚀 本地开发
 
-安装依赖：
-
-```bash
-npm install
-```
-
-启动开发环境：
-
-```bash
-npm run dev
-```
-
-运行测试：
-
-```bash
-npm test
-```
-
-类型检查：
-
-```bash
-npm run typecheck
-```
-
-构建扩展：
-
-```bash
-npm run build
-```
-
-构建并生成可发布的 `dist.zip`：
-
-```bash
-npm run package
-```
-
-打包完成后，发布包会出现在：
-
-```bash
-release/dist.zip
-```
 
 ## 📄 License
 
